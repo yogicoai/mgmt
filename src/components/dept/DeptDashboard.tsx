@@ -65,6 +65,14 @@ export function DeptDashboard({ meta, reference, year, prevYear, viewer }: { met
     setTab(key);
     window.history.replaceState(null, "", `#${key}`);
   };
+  // 로고 → 첫 화면: 팀 계정은 자기 팀 가이드라인, 경영지원은 통합 대시보드
+  const goHome = (e: React.MouseEvent) => {
+    if (viewer.isAdmin) return;
+    e.preventDefault();
+    setTab("guide");
+    window.history.replaceState(null, "", window.location.pathname);
+    window.scrollTo({ top: 0 });
+  };
 
   // 목표매출에 온라인/오프라인이 있으면 전년 실적(onlineData MCP)을 참고로 같이 보여 준다
   const wantsActuals = Boolean(doc?.salesForecastRows.some((r) => r.kind === "온라인" || r.kind === "오프라인"));
@@ -92,8 +100,10 @@ export function DeptDashboard({ meta, reference, year, prevYear, viewer }: { met
     <>
       <header className="app-header">
         <div className="brand">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="YOGI CORPORATION 로고" />
+          <a href={viewer.isAdmin ? "/" : `/dept/${meta.code}`} className="brand-home" onClick={goHome} title={viewer.isAdmin ? "통합 대시보드 첫 화면으로" : "첫 화면으로"}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="YOGI CORPORATION 로고 — 첫 화면으로" />
+          </a>
           <h1>
             {year} 요기코퍼레이션 정기 예산 설정_{meta.name}[{meta.code}]
           </h1>

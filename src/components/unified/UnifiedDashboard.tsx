@@ -111,6 +111,13 @@ export function UnifiedDashboard({
     window.history.replaceState(null, "", `#${key}`);
     window.scrollTo({ top: 0 });
   };
+  // 로고 → 첫 화면(전체 매출 현황)
+  const goHome = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setTab("revenue");
+    window.history.replaceState(null, "", "/");
+    window.scrollTo({ top: 0 });
+  };
 
   const deptMeta = tab.startsWith("dept-") ? metas.find((m) => `dept-${m.code}` === tab) : undefined;
   const conn = error
@@ -125,8 +132,10 @@ export function UnifiedDashboard({
     <>
       <header className="app-header">
         <div className="brand">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="YOGI CORPORATION 로고" />
+          <a href="/" className="brand-home" onClick={goHome} title="첫 화면으로">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="YOGI CORPORATION 로고 — 첫 화면으로" />
+          </a>
           <h1>{year} 요기코퍼레이션 통합 예산</h1>
         </div>
         <div className="header-side no-print">
