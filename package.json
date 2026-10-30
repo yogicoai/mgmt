@@ -4,7 +4,7 @@
   "private": true,
   "description": "요기코퍼레이션 부서별·통합 예산 대시보드 (Next.js + MongoDB + onlineData MCP)",
   "scripts": {
-    "dev": "next dev --webpack -p 6400",
+    "dev": "next dev --webpack -H 127.0.0.1 -p 6400",
     "dev:turbo": "next dev -p 6400",
     "build": "next build --webpack",
     "start": "next start -p 6400",

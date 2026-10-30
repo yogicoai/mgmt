@@ -15,7 +15,13 @@ const deptTemplates = templates.departments as DeptTemplate[];
 
 export const BUDGET_YEAR = Number(process.env.BUDGET_YEAR || templates.year);
 
-export const deptMetas: DeptMeta[] = deptTemplates.map(({ code, name, category, note, positions, hasStore, storePositions }) => ({
+// 숨김 부서 — 공통(0017)은 일단 쓰지 않음(경영지원 요청, 10/29). 통합 화면 탭·합계·부서 선택·계정 관리·로그인에서 모두 빠진다(DB 문서는 그대로)
+const HIDDEN_DEPTS = new Set(["0017"]);
+
+// 부서 화면에서 목표매출을 직접 입력하는 부서 — 마케팅·영업·온라인고객지원(경영지원 요청). 나머지는 통합 화면에서 경영지원이 입력
+const SALES_INPUT_DEPTS = new Set(["0004", "0011", "0016"]);
+
+export const deptMetas: DeptMeta[] = deptTemplates.filter((t) => !HIDDEN_DEPTS.has(t.code)).map(({ code, name, category, note, positions, hasStore, storePositions }) => ({
   code,
   name,
   category,
@@ -23,6 +29,7 @@ export const deptMetas: DeptMeta[] = deptTemplates.map(({ code, name, category, 
   positions,
   hasStore,
   storePositions,
+  salesInput: SALES_INPUT_DEPTS.has(code),
 }));
 
 export const channels = revenue.channels as Channel[];

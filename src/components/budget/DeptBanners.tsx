@@ -6,9 +6,17 @@ const SECTION_NAMES = { accounts: "계정별 예산", personnel: "인원정보",
 
 // 부서 문서 상태 안내 — 불러오기 실패·저장 충돌·저장 실패·마감
 export function DeptBanners({ state, closedHint, showClosed = true }: { state: DepartmentState; closedHint?: string; showClosed?: boolean }) {
-  const { doc, loadError, conflict, saveError, saveState, reload, resolveConflict, saveNow } = state;
+  const { doc, loadError, conflict, saveError, saveState, reload, resolveConflict, saveNow, adminNotice, dismissAdminNotice } = state;
   return (
     <>
+      {adminNotice && (
+        <div className="banner warn">
+          <span>{adminNotice}</span>
+          <button type="button" onClick={dismissAdminNotice}>
+            확인
+          </button>
+        </div>
+      )}
       {loadError && (
         <div className="banner err">
           <span>자료를 불러오지 못했습니다 — {loadError}</span>

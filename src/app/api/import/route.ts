@@ -63,7 +63,7 @@ export const POST = handle(async (request: Request) => {
       patch.salesForecastRows = d.salesForecastRows;
     }
     if (Object.keys(expected).length) {
-      const result = await store.patchDepartment(BUDGET_YEAR, d.code, expected, patch, { markSaved: true, allowClosed: false });
+      const result = await store.patchDepartment(BUDGET_YEAR, d.code, expected, patch, { markSaved: true, allowClosed: false, by: "admin" });
       if (!result.ok) {
         skipped.push(`${d.name}(${result.reason === "closed" ? "마감됨" : "저장 충돌 — 다시 시도"})`);
         continue;

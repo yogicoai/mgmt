@@ -152,6 +152,7 @@ export function AccountsPanel({ year }: { year: number }) {
           </table>
         </div>
       </section>
+      <ViewPasswordPanel />
 
       {dialog?.kind === "password" && (
         <PasswordDialog
@@ -243,5 +244,80 @@ function LoginIdDialog({ account, onSave, onClose }: { account: PublicAccount; o
         </label>
       </div>
     </Modal>
+  );
+}
+
+// 급여 열람 비밀번호 — 급여 등 경영지원 전용 계정을 볼 때 넣는 비밀번호. 정하지 않으면 경영지원 로그인 비밀번호로 확인
+function ViewPasswordPanel() {
+  const { notify } = useUi();
+  const [state, setState] = useState<{ set: boolean; updatedAt: string | null } | null>(null);
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ current: "", next: "", again: "" });
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => {
+    api<{ set: boolean; updatedAt: string | null }>("/api/auth/view-password")
+      .then(setState)
+      .catch(() => undefined);
+  }, []);
+  useEffect(() => load(), [load]);
+  const problem =
+    form.next.length < 8 ? "8자 이상" : !/[A-Za-z]/.test(form.next) || !/[0-9]/.test(form.next) ? "영문과 숫자를 섞어 주세요" : form.next !== form.again ? "두 번 입력한 값이 다릅니다" : null;
+  const save = async () => {
+    setBusy(true);
+    try {
+      const r = await api<{ set: boolean; updatedAt: string | null }>("/api/auth/view-password", { method: "POST", body: JSON.stringify({ currentPassword: form.current, newPassword: form.next }) });
+      setState(r);
+      setOpen(false);
+      setForm({ current: "", next: "", again: "" });
+      notify("급여 열람 비밀번호를 정했습니다. 급여 담당자에게만 알려 주세요.");
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e), true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="panel">
+      <div className="panel-head">
+        <h3>급여 열람 비밀번호</h3>
+        <button type="button" className="primary" onClick={() => setOpen(true)}>
+          {state?.set ? "바꾸기" : "정하기"}
+        </button>
+      </div>
+      <p className="muted" style={{ margin: 0 }}>
+        직원급여·퇴직급여 등 경영지원 전용 계정을 볼 때 한 번 더 넣는 비밀번호입니다.{" "}
+        {state === null ? "" : state.set ? <b>설정됨 · {formatTime(state.updatedAt)}</b> : <b>아직 정하지 않음 — 지금은 경영지원 로그인 비밀번호로 확인합니다.</b>} 로그인 계정을 여럿이 같이 쓴다면 급여 담당자만 아는 비밀번호로 정해 두세요.
+      </p>
+      {open && (
+        <Modal
+          className="memo-dialog"
+          title={`급여 열람 비밀번호 ${state?.set ? "바꾸기" : "정하기"}`}
+          onClose={() => setOpen(false)}
+          footer={
+            <>
+              <span className="muted">{problem ?? "로그인 비밀번호와 다르게 정해 주세요"}</span>
+              <button type="button" className="primary" disabled={Boolean(problem) || busy} onClick={() => void save()}>
+                저장
+              </button>
+            </>
+          }
+        >
+          <div className="modal-body form-grid">
+            <label>
+              지금 로그인 비밀번호(확인용)
+              <input type="password" value={form.current} onChange={(e) => setForm({ ...form, current: e.target.value })} autoComplete="current-password" autoFocus />
+            </label>
+            <label>
+              새 급여 열람 비밀번호 (8자 이상, 영문+숫자)
+              <input type="password" value={form.next} onChange={(e) => setForm({ ...form, next: e.target.value })} autoComplete="new-password" />
+            </label>
+            <label>
+              한 번 더
+              <input type="password" value={form.again} onChange={(e) => setForm({ ...form, again: e.target.value })} autoComplete="new-password" />
+            </label>
+          </div>
+        </Modal>
+      )}
+    </section>
   );
 }

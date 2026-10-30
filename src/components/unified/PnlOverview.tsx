@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MONTHS, channelTotals, money, percent, revenueMetrics, sum } from "@/lib/budget";
+import { MONTHS, channelTotals, isSensitiveAccount, money, percent, revenueMetrics, sum } from "@/lib/budget";
 import { downloadCsv } from "@/lib/client";
 import type { Channel, DepartmentDoc, PnlPrior, RevenuePlan } from "@/lib/types";
-import { StatCard } from "../ui";
+import { UnlockDialog, useSensitiveAccess } from "../SensitiveGate";
+import { StatCard, type Viewer } from "../ui";
 import { PlanRowDialog } from "./PlanRowDialog";
 
 interface PnlRow {
@@ -27,6 +28,7 @@ export function PnlOverview({
   plan,
   pnlPrior,
   onPlanSaved,
+  viewer,
 }: {
   year: number;
   prevYear: number;
@@ -35,8 +37,14 @@ export function PnlOverview({
   plan: RevenuePlan;
   pnlPrior: PnlPrior[];
   onPlanSaved: (plan: RevenuePlan) => void;
+  viewer: Viewer;
 }) {
   const [cogsIndex, setCogsIndex] = useState<number | null>(null);
+  // 급여 등 경영지원 전용 계정 줄은 비밀번호 확인 전 가림
+  const sensitive = useSensitiveAccess({ isAdmin: viewer.isAdmin, master: viewer.master });
+  const [unlocking, setUnlocking] = useState(false);
+  const sensitiveNames = useMemo(() => new Set(departments.flatMap((d) => d.accounts.filter(isSensitiveAccount).map((a) => a.name))), [departments]);
+  const maskedRow = (label: string) => !sensitive.visible && sensitiveNames.has(label);
   const priorOf = (name: string) => pnlPrior.find((p) => p.name === name)?.prior ?? null;
 
   const rows = useMemo<PnlRow[]>(() => {
@@ -76,6 +84,7 @@ export function PnlOverview({
       ...rows.map((r) => {
         const now = sum(r.months);
         const c = change(now, r.prior);
+        if (maskedRow(r.label)) return [r.label, "", "", "", "", ...r.months.map(() => "")];
         return [r.label, r.prior ?? "", now, r.prior === null ? "" : now - r.prior, c === null ? "" : `${(c * 100).toFixed(1)}%`, ...r.months];
       }),
     ]);
@@ -88,6 +97,11 @@ export function PnlOverview({
           <span className="muted">매출액(손익계산서) − 매출원가 = 매출총이익 − 판매비와관리비(전 부서 합산) = 영업손익</span>
         </div>
         <div className="actions">
+          {!sensitive.visible && sensitive.canUnlock && (
+            <button type="button" onClick={() => setUnlocking(true)} title="급여 등 경영지원 전용 계정 줄 보기">
+              🔒 급여 등 보기
+            </button>
+          )}
           <button type="button" onClick={exportCsv}>
             손익 CSV
           </button>
@@ -141,6 +155,19 @@ export function PnlOverview({
               {rows.map((r) => {
                 const now = sum(r.months);
                 const c = change(now, r.prior);
+                if (maskedRow(r.label))
+                  return (
+                    <tr key={r.label} className={`pnl-${r.kind}`}>
+                      <td>
+                        {r.label} <span className="lock-chip">🔒</span>
+                      </td>
+                      {Array.from({ length: 4 + MONTHS.length }, (_, i) => (
+                        <td key={i} className="masked-cell">
+                          •••
+                        </td>
+                      ))}
+                    </tr>
+                  );
                 return (
                   <tr key={r.label} className={`pnl-${r.kind}`}>
                     <td>
@@ -170,6 +197,7 @@ export function PnlOverview({
           </table>
         </div>
       </section>
+      {unlocking && <UnlockDialog onClose={() => setUnlocking(false)} />}
       {cogsIndex !== null && <PlanRowDialog plan={plan} field="cogs" index={cogsIndex} onSaved={onPlanSaved} onClose={() => setCogsIndex(null)} />}
     </>
   );

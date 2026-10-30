@@ -5,6 +5,8 @@ import { setSessionCookie } from "@/lib/auth/guard";
 import { verifyPassword } from "@/lib/auth/password";
 import { fail, handle } from "@/lib/http";
 import { getStore } from "@/lib/store";
+import { isLocalMaster } from "@/lib/auth/local";
+import { findDeptMeta } from "@/lib/templates";
 
 const schema = z.object({ loginId: z.string().min(1).max(60), password: z.string().min(1).max(200) });
 
@@ -37,7 +39,9 @@ export const POST = handle(async (request: NextRequest) => {
     return fail("아이디 또는 비밀번호가 맞지 않습니다.", 401);
   }
   fails.delete(key);
-  const updated = (await store.updateAccount(account._id, { lastLoginAt: new Date().toISOString() })) ?? account;
+  if (!findDeptMeta(account.deptCode)) return fail("지금은 쓰지 않는 부서 계정입니다. 경영지원팀에 문의해 주세요.", 403);
+  // 로컬 마스터(이 PC 개발 서버)에서 '계정으로 보기'로 들어온 것은 계정 관리의 '마지막 로그인'에 남기지 않는다
+  const updated = isLocalMaster(request.headers) ? account : ((await store.updateAccount(account._id, { lastLoginAt: new Date().toISOString() })) ?? account);
   const response = NextResponse.json({ home: homeOf(updated), deptName: updated.deptName });
   setSessionCookie(response, updated, request);
   return response;

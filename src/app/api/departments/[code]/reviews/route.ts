@@ -1,7 +1,7 @@
 import { requireAdmin, requireDept } from "@/lib/auth/guard";
 import { getDepartment } from "@/lib/departments";
 import { fail, handle, json } from "@/lib/http";
-import { authorOf, newId, reviewCreateSchema } from "@/lib/reviews";
+import { authorFor, newId, reviewCreateSchema } from "@/lib/reviews";
 import { getStore } from "@/lib/store";
 import { BUDGET_YEAR } from "@/lib/templates";
 import type { ReviewComment } from "@/lib/types";
@@ -32,7 +32,7 @@ export const POST = handle(async (request: Request, { params }: Context) => {
     account,
     month: account ? (body.month ?? null) : null,
     text: body.text,
-    author: authorOf(admin),
+    author: await authorFor(admin),
     status: "open",
     createdAt: now,
     updatedAt: now,

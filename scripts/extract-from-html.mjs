@@ -148,6 +148,16 @@ for (const file of deptFiles) {
 }
 
 // ── 부서 목록: 코드설명표의 부서코드 순서 ─────────────────────
+// 원본에 없는 직급(경영지원 요청) — 물류 부장, 영업 매장 '중간관리'(매장 직급 맨 앞)
+const EXTRA_POSITIONS = { 물류: ['부장'] };
+const EXTRA_STORE_POSITIONS = { 영업: ['중간관리'] };
+const withExtra = (list, extra = []) => [...extra.filter((p) => !list.includes(p)), ...list];
+// 매장 직급은 전체 직급 목록에서도 첫 매장 직급 바로 앞에 끼운다
+const withStoreExtra = (list, store, extra = []) => {
+  const add = extra.filter((p) => !list.includes(p));
+  const at = list.findIndex((p) => store.includes(p));
+  return at < 0 ? [...list, ...add] : [...list.slice(0, at), ...add, ...list.slice(at)];
+};
 const departments = reference.depts.map(([code, name, category, note]) => {
   const own = Object.values(parsed).find((p) => p.code === code);
   // 물류는 부서 파일이 없어 마케팅 파일 안의 '물류센터' 원장을 쓴다(통합 대시보드 SEED 와 같은 출처)
@@ -160,9 +170,9 @@ const departments = reference.depts.map(([code, name, category, note]) => {
     name,
     category: category || name,
     note: note || '',
-    positions: own?.positions.length ? own.positions : ['차장', '과장', '대리', '주임'],
+    positions: withStoreExtra(withExtra(own?.positions.length ? own.positions : ['차장', '과장', '대리', '주임'], EXTRA_POSITIONS[name]), own?.storePositions || [], EXTRA_STORE_POSITIONS[name]),
     hasStore: own?.hasStore || false,
-    storePositions: own?.storePositions || [],
+    storePositions: withExtra(own?.storePositions || [], EXTRA_STORE_POSITIONS[name]),
     accounts: accountTemplate(sourceData, sourceName),
     personnel: own?.personnel || [],
     salesForecastRows: own?.salesForecastRows || [],

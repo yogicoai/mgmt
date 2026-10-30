@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useDepartment } from "@/hooks/useDepartment";
+import { useHiddenAccounts } from "@/hooks/useHiddenAccounts";
 import { useReviews } from "@/hooks/useReviews";
 import { api } from "@/lib/client";
 import type { ActualsResult, DeptMeta } from "@/lib/types";
@@ -11,6 +12,7 @@ import { BudgetLedger } from "../budget/BudgetLedger";
 import { DeptBanners } from "../budget/DeptBanners";
 import { PersonnelEditor } from "../budget/PersonnelEditor";
 import { ReviewPanel } from "../budget/ReviewPanel";
+import { PresenceLayer } from "../Presence";
 import { UserMenu, useUi, type Viewer } from "../ui";
 import { CodesTable } from "./CodesTable";
 import { Guideline } from "./Guideline";
@@ -33,13 +35,28 @@ export function statusChipClass(label: string) {
 }
 
 // 부서별 예산 대시보드 — 원본 '2027년_정기_예산_대시보드_0011_영업.html' 과 같은 탭 구성
-export function DeptDashboard({ meta, reference, year, prevYear, viewer }: { meta: DeptMeta; reference: Reference; year: number; prevYear: number; viewer: Viewer }) {
+export function DeptDashboard({
+  meta,
+  reference,
+  year,
+  prevYear,
+  salesKinds,
+  viewer,
+}: {
+  meta: DeptMeta;
+  reference: Reference;
+  year: number;
+  prevYear: number;
+  salesKinds: string[];
+  viewer: Viewer;
+}) {
   const { notify } = useUi();
-  const state = useDepartment(meta.code);
+  const state = useDepartment(meta.code, { team: !viewer.isAdmin }); // 팀 화면은 동시 수정 때 경영지원 값 우선
   const { doc, update, statusLabel, saveNow, setClosed } = state;
   const [tab, setTab] = useState<TabKey>("guide");
   const [actuals, setActuals] = useState<ActualsResult | null>(null);
   const reviews = useReviews(meta.code);
+  const hiddenAccounts = useHiddenAccounts(meta.code);
   const editable = Boolean(doc && !doc.closed);
 
   const tabs: { key: TabKey; label: string }[] = [
@@ -115,8 +132,18 @@ export function DeptDashboard({ meta, reference, year, prevYear, viewer }: { met
               통합 대시보드
             </Link>
           )}
-          <button type="button" onClick={() => window.print()}>
-            인쇄 / PDF 저장
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="새로고침"
+            title="새로고침 — 입력 중인 값은 먼저 저장하고, 다른 화면(경영지원 등)에서 바꾼 최신 자료를 불러옵니다"
+            onClick={async () => {
+              if (!(await saveNow())) return;
+              await state.reload();
+              notify("최신 자료를 불러왔습니다.");
+            }}
+          >
+            ↻
           </button>
           <UserMenu viewer={viewer} />
         </div>
@@ -128,7 +155,8 @@ export function DeptDashboard({ meta, reference, year, prevYear, viewer }: { met
           </button>
         ))}
       </nav>
-      <main className="page">
+      <main className="page" data-anchor={`main:${tab}`}>
+        <PresenceLayer page={`dept:${meta.code}`} where={tabs.find((t) => t.key === tab)?.label ?? ""} />
         <DeptBanners state={state} closedHint={viewer.isAdmin ? "통합 대시보드의 부서 탭에서 마감을 해제할 수 있습니다." : "수정이 필요하면 경영지원팀에 마감 해제를 요청하세요."} />
         {reviews.openCount > 0 && tab !== "reviews" && (
           <div className="banner warn">
@@ -141,7 +169,17 @@ export function DeptDashboard({ meta, reference, year, prevYear, viewer }: { met
           </div>
         )}
         {!doc && !state.loadError && <div className="empty">불러오는 중…</div>}
-        {doc && tab === "guide" && <Guideline guide={reference.guide} salesRows={doc.salesForecastRows} actuals={actuals} />}
+        {doc && tab === "guide" && (
+          <Guideline
+            guide={reference.guide}
+            deptName={meta.name}
+            salesRows={doc.salesForecastRows}
+            salesKinds={salesKinds}
+            salesEditable={editable && (viewer.isAdmin || meta.salesInput)}
+            onSalesChange={(fn) => update("sales", fn)}
+            actuals={actuals}
+          />
+        )}
         {tab === "codes" && <CodesTable codes={reference.codes} depts={reference.depts} />}
         {doc && tab === "personnel" && (
           <PersonnelEditor
@@ -161,6 +199,8 @@ export function DeptDashboard({ meta, reference, year, prevYear, viewer }: { met
             onBeforeExport={saveNow}
             openReviews={reviews.openByAccount}
             isAdmin={viewer.isAdmin}
+            master={viewer.master}
+            hiddenAccounts={hiddenAccounts}
             actions={
               editable && (
                 <>

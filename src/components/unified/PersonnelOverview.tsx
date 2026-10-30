@@ -5,16 +5,23 @@ import { MONTHS, personnelMonths } from "@/lib/budget";
 import { downloadCsv } from "@/lib/client";
 import type { DepartmentDoc } from "@/lib/types";
 
+// 인원이 없는 부서(공통 비용 부서)는 인원현황에서 뺀다
+const NO_HEADCOUNT = new Set(["0017"]);
+
+// 영업 매장 직원은 "매장명/직급"
+const positionLabel = (p: { position: string; store?: string }) => [p.store, p.position || "—"].filter(Boolean).join("/");
+
 // 인원현황 — 부서가 입력한 2027년 인원정보를 부서별로 묶어서(원본 renderPersonnelOverview)
-export function PersonnelOverview({ year, departments }: { year: number; departments: DepartmentDoc[] }) {
+export function PersonnelOverview({ year, departments: all }: { year: number; departments: DepartmentDoc[] }) {
   const [filter, setFilter] = useState("all");
+  const departments = all.filter((d) => !NO_HEADCOUNT.has(d.code));
   const shown = filter === "all" ? departments : departments.filter((d) => d.code === filter);
   const totals = MONTHS.map((_, m) => shown.reduce((t, d) => t + personnelMonths(d.personnel)[m], 0));
 
   const exportCsv = () =>
     downloadCsv(`${year}_인원현황.csv`, [
-      ["부서코드", "부서", "직급", "매장명", "이름", ...MONTHS],
-      ...shown.flatMap((d) => d.personnel.map((p) => [d.code, d.name, p.position, p.store ?? "", p.name, ...p.values])),
+      ["부서코드", "부서", "매장명", "직급", "이름", ...MONTHS],
+      ...shown.flatMap((d) => d.personnel.map((p) => [d.code, d.name, p.store ?? "", p.position, p.name, ...p.values])),
     ]);
 
   return (
@@ -46,8 +53,8 @@ export function PersonnelOverview({ year, departments }: { year: number; departm
         <div className="tablewrap">
           <table className="headcount-table">
             <colgroup>
-              <col style={{ width: 170 }} />
-              <col style={{ width: 140 }} />
+              <col style={{ width: 260 }} />
+              <col style={{ width: 100 }} />
               {MONTHS.map((m) => (
                 <col key={m} />
               ))}
@@ -78,10 +85,7 @@ export function PersonnelOverview({ year, departments }: { year: number; departm
                 </tr>,
                 ...d.personnel.map((p, i) => (
                   <tr key={`${d.code}-${i}`} className="person">
-                    <td>
-                      {p.position || "—"}
-                      {p.store ? ` · ${p.store}` : ""}
-                    </td>
+                    <td title={positionLabel(p)}>{positionLabel(p)}</td>
                     <td>{p.name}</td>
                     {p.values.map((v, m) => (
                       <td key={m}>{v.toLocaleString("ko-KR")}</td>

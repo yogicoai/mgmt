@@ -114,10 +114,20 @@ export interface Viewer {
   loginId: string;
   deptName: string;
   isAdmin: boolean;
+  master?: boolean; // 로컬 마스터(로그인 없이 들어온 이 PC)
 }
 
 // 머리말 오른쪽: 로그인한 계정 + 로그아웃
 export function UserMenu({ viewer }: { viewer: Viewer }) {
+  // 로컬 마스터 — 화면에 '마스터'라는 표시를 남기지 않는다(화면 공유 때도 드러나지 않게)
+  if (viewer.master)
+    return (
+      <span className="user-menu">
+        <a className="button-link" href="/login">
+          계정으로 보기
+        </a>
+      </span>
+    );
   return (
     <span className="user-menu">
       <span className="muted" title={viewer.isAdmin ? "통합예산·계정 관리 권한" : undefined}>

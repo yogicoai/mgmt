@@ -67,10 +67,9 @@ function wrappedLines(text: string, width: number) {
 
 function itemSpans(rows: BudgetRow[]) {
   return rows.map((row, i) => {
-    if (row.custom) return 1;
-    if (i > 0 && !rows[i - 1].custom && rows[i - 1].item === row.item) return 0;
+    if (i > 0 && rows[i - 1].item === row.item) return 0;
     let n = 1;
-    while (i + n < rows.length && !rows[i + n].custom && rows[i + n].item === row.item) n++;
+    while (i + n < rows.length && rows[i + n].item === row.item) n++;
     return n;
   });
 }

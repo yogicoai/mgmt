@@ -18,6 +18,8 @@ export const budgetRowSchema = z.object({
 export const accountSchema = z.object({
   name: z.string().min(1).max(100),
   rows: z.array(budgetRowSchema).max(500),
+  masked: z.boolean().optional(), // 서버가 다시 채우므로 저장하지 않음
+  lastEdit: z.object({ at: z.string(), loginId: z.string(), deptName: z.string(), ip: z.string() }).optional(), // 서버가 다시 정함
 });
 
 export const personSchema = z.object({

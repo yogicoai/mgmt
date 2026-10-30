@@ -10,9 +10,19 @@ export interface BudgetRow {
   locked?: boolean; // 경영지원 입력 줄 — 팀 화면에서는 조회만(급여·4대보험·회사 행사 등)
 }
 
+// 계정 마지막 수정 기록 — 언제·누가(팀 ID)·어디서(IP). 서버가 남김
+export interface AccountEdit {
+  at: string;
+  loginId: string;
+  deptName: string;
+  ip: string; // 팀 계정에 보낼 때는 비움
+}
+
 export interface BudgetAccount {
   name: string; // 계정과목
   rows: BudgetRow[];
+  masked?: boolean; // 팀 화면용 — 경영지원 전용 계정이라 금액을 보내지 않음
+  lastEdit?: AccountEdit;
 }
 
 export interface PersonRow {
@@ -46,8 +56,55 @@ export interface DepartmentDoc {
   closedAt: string | null;
   locksApplied?: boolean; // 템플릿의 '경영지원 입력' 잠금을 붙였는지(옛 문서 이전용)
   savedAt: string | null; // 부서 입력(계정·인원)이 마지막으로 저장된 시각
+  savedBy?: Partial<Record<Section, AccountRole>>; // 구역별 마지막 저장자 — 동시 수정 충돌 때 경영지원 값 우선
   updatedAt: string;
   createdAt: string;
+}
+
+// 같은 화면 접속 표시·실시간 커서 — 위치는 좌표가 아니라 "어느 영역(data-anchor)의 어느 표 몇째 칸 안 어디"로 주고받는다
+export interface CursorLoc {
+  a: string; // data-anchor
+  t?: number; // 영역 안 몇 번째 표
+  r?: number; // 표의 행 번호(rowIndex)
+  c?: number; // 행 안 칸 번호(cellIndex)
+  fx: number; // 칸(또는 영역) 안 가로 위치 0~1
+  fy: number; // 세로 위치 0~1
+}
+
+// 실시간 반영 — 접속 신호 응답에 실어 보내는 부서별 저장 번호(이 번호가 올라가면 그 구역만 다시 받아 온다)
+export interface DeptRevisionInfo {
+  code: string;
+  revisions: Record<Section, number>;
+  closed: boolean;
+}
+
+export interface SyncInfo {
+  depts: Record<string, DeptRevisionInfo>;
+  plan?: number; // 매출 예산안(수수료·매출원가) 저장 번호 — 통합 화면만
+  visibility?: number; // 계정과목 노출 설정 저장 번호
+}
+
+// 계정과목 노출 — 경영지원이 계정과목별로 어느 부서에 보일지 정한다. hidden = 그 계정을 숨긴 부서코드들(없으면 전 부서에 보임)
+export interface AccountVisibility {
+  _id: string; // `${year}:visibility`
+  year: number;
+  hidden: Record<string, string[]>;
+  revision: number;
+  updatedAt: string;
+}
+
+export interface PresenceEntry {
+  _id: string; // 창(탭)마다 하나
+  page: string; // dept:0005 · unified
+  accountId: string;
+  loginId: string;
+  deptName: string;
+  where: string; // 보고 있는 탭 이름
+  editing: boolean; // 최근 15초 안에 입력
+  loc: CursorLoc | null;
+  focus: CursorLoc | null; // 입력 중인 칸
+  click: { loc: CursorLoc; at: number } | null;
+  at: number; // 마지막 신호(ms)
 }
 
 export interface DeptMeta {
@@ -58,6 +115,7 @@ export interface DeptMeta {
   positions: string[];
   hasStore: boolean;
   storePositions: string[];
+  salesInput: boolean; // 부서 화면에서 월별 목표매출을 직접 입력(마케팅·영업·온라인고객지원)
 }
 
 export type AttachmentKind = "sales" | "expenses";
@@ -135,11 +193,13 @@ export interface LoginAccount {
   active: boolean;
   passwordUpdatedAt: string | null;
   lastLoginAt: string | null;
+  viewPasswordHash?: string | null; // 경영지원 계정만 — 급여 열람 비밀번호(해시)
+  viewPasswordUpdatedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
-export type PublicAccount = Omit<LoginAccount, "passwordHash"> & { hasPassword: boolean };
+export type PublicAccount = Omit<LoginAccount, "passwordHash" | "viewPasswordHash"> & { hasPassword: boolean };
 
 // 검토 의견 — 경영지원이 팀 예산에 남기는 첨언·수정 요청, 팀은 답글
 export interface ReviewAuthor {

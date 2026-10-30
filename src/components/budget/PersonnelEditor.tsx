@@ -50,7 +50,7 @@ export function PersonnelEditor({
     });
 
   return (
-    <section className="panel">
+    <section className="panel" data-anchor="personnel">
       <div className="panel-head">
         <h3>{"2027년 인원정보"}</h3>
         <div className="actions">
@@ -76,10 +76,10 @@ export function PersonnelEditor({
           <colgroup>
             {showDelete && <col style={{ width: 62 }} />}
             <col style={{ width: 64 }} />
-            <col style={{ width: 96 }} />
-            <col style={{ width: 100 }} />
+            <col style={{ width: 120 }} />
             {meta.hasStore && <col style={{ width: 130 }} />}
             <col style={{ width: 130 }} />
+            <col style={{ width: 96 }} />
             {MONTHS.map((m) => (
               <col key={m} />
             ))}
@@ -90,8 +90,8 @@ export function PersonnelEditor({
               {showDelete && <th>순서</th>}
               <th>부서코드</th>
               <th>부서명</th>
-              <th>직급</th>
               {meta.hasStore && <th>매장명</th>}
+              <th>직급</th>
               <th>이름</th>
               {MONTHS.map((m) => (
                 <th key={m}>{m}</th>
@@ -120,6 +120,17 @@ export function PersonnelEditor({
                   )}
                   <td className="fixed">{r.code}</td>
                   <td className="fixed">{r.dept}</td>
+                  {meta.hasStore && (
+                    <td>
+                      <input
+                        value={r.store ?? ""}
+                        disabled={!rowEditable || !isStore(r.position)}
+                        placeholder={isStore(r.position) ? "매장명" : ""}
+                        aria-label="매장명"
+                        onChange={(e) => setRow(i, { store: e.target.value })}
+                      />
+                    </td>
+                  )}
                   <td>
                     <select value={r.position} disabled={!rowEditable} aria-label="직급" onChange={(e) => setRow(i, { position: e.target.value })}>
                       <option value="" disabled>
@@ -132,17 +143,6 @@ export function PersonnelEditor({
                       ))}
                     </select>
                   </td>
-                  {meta.hasStore && (
-                    <td>
-                      <input
-                        value={r.store ?? ""}
-                        disabled={!rowEditable || !isStore(r.position)}
-                        placeholder={isStore(r.position) ? "매장명" : ""}
-                        aria-label="매장명"
-                        onChange={(e) => setRow(i, { store: e.target.value })}
-                      />
-                    </td>
-                  )}
                   <td>
                     <input value={r.name} readOnly={!rowEditable} aria-label="이름" onChange={(e) => setRow(i, { name: e.target.value })} />
                   </td>

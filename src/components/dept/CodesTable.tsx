@@ -27,7 +27,7 @@ export function CodesTable({ codes, depts }: { codes: string[][]; depts: string[
 
   return (
     <>
-      <section className="panel">
+      <section className="panel" data-anchor="codes">
         <div className="panel-head">
           <h3>코드설명표</h3>
           <input type="search" placeholder="계정명 · 코드 · 상세설명 검색" aria-label="코드설명표 검색" value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: "min(100%, 420px)" }} />
@@ -75,12 +75,12 @@ export function CodesTable({ codes, depts }: { codes: string[][]; depts: string[
           </table>
         </div>
       </section>
-      <section className="panel">
+      <section className="panel" data-anchor="dept-codes">
         <div className="panel-head">
           <h3>부서코드</h3>
         </div>
         <div className="tablewrap free">
-          <table>
+          <table className="dept-codes-table">
             <thead>
               <tr>
                 {["부서코드", "부서명", "분류", "비고"].map((h) => (

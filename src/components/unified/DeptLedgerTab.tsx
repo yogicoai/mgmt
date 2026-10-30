@@ -1,6 +1,7 @@
 "use client";
 
 import { useDepartment } from "@/hooks/useDepartment";
+import { useHiddenAccounts } from "@/hooks/useHiddenAccounts";
 import { useReviews } from "@/hooks/useReviews";
 import type { DeptMeta } from "@/lib/types";
 import { BudgetLedger } from "../budget/BudgetLedger";
@@ -13,6 +14,7 @@ export function DeptLedgerTab({ meta, year, onSaved, viewer }: { meta: DeptMeta;
   const { notify } = useUi();
   const state = useDepartment(meta.code, { onSaved });
   const reviews = useReviews(meta.code);
+  const hiddenAccounts = useHiddenAccounts(meta.code);
   const { doc, update, statusLabel, saveNow, setClosed } = state;
   const editable = Boolean(doc && !doc.closed);
 
@@ -69,6 +71,8 @@ export function DeptLedgerTab({ meta, year, onSaved, viewer }: { meta: DeptMeta;
           onBeforeExport={saveNow}
           openReviews={reviews.openByAccount}
           isAdmin={viewer.isAdmin}
+          master={viewer.master}
+          hiddenAccounts={hiddenAccounts}
         />
       )}
       {doc && <ReviewPanel state={reviews} viewer={viewer} accounts={doc.accounts.map((a) => a.name)} deptName={meta.name} />}

@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, formatTime } from "@/lib/client";
-import type { Channel, DepartmentDoc, DeptMeta, PnlPrior, Revenue2026Row, RevenuePlan, StorageKind } from "@/lib/types";
+import type { Channel, DepartmentDoc, DeptMeta, PnlPrior, Revenue2026Row, RevenuePlan, StorageKind, SyncInfo } from "@/lib/types";
 import { UserMenu, useUi, type Viewer } from "../ui";
+import { AccountVisibilityPanel } from "./AccountVisibilityPanel";
 import { AccountsPanel } from "./AccountsPanel";
 import { BackdataOverview } from "./BackdataOverview";
 import { BudgetOverview } from "./BudgetOverview";
 import { DeptLedgerTab } from "./DeptLedgerTab";
 import { PersonnelOverview } from "./PersonnelOverview";
 import { PnlOverview } from "./PnlOverview";
+import { PresenceLayer, SYNC_EVENT } from "../Presence";
 import { RevenueOverview } from "./RevenueOverview";
 
 interface Health {
@@ -54,6 +56,7 @@ export function UnifiedDashboard({
     { key: "personnel", label: "인원현황" },
     ...metas.map((m) => ({ key: `dept-${m.code}`, label: m.name })),
     { key: "backdata", label: "부서별 백데이터" },
+    { key: "visibility", label: "계정과목 노출" },
     { key: "accounts", label: "계정 관리" },
   ];
 
@@ -68,6 +71,26 @@ export function UnifiedDashboard({
       setError(e instanceof Error ? e.message : String(e));
     }
   }, []);
+
+  // 다른 화면이 저장하면(접속 신호의 저장 번호) 합산·매출 예산안을 바로 다시 — 새로고침 없이
+  const latest = useRef({ departments, plan });
+  latest.current = { departments, plan };
+  useEffect(() => {
+    const onSync = (e: Event) => {
+      const sync = (e as CustomEvent<SyncInfo>).detail;
+      const { departments: list, plan: current } = latest.current;
+      if (!list || !current) return;
+      const changed =
+        (sync.plan !== undefined && sync.plan !== current.revision) ||
+        Object.values(sync.depts).some((r) => {
+          const d = list.find((x) => x.code === r.code);
+          return !d || d.closed !== r.closed || (["accounts", "personnel", "sales"] as const).some((s) => d.revisions[s] !== r.revisions[s]);
+        });
+      if (changed) void load();
+    };
+    window.addEventListener(SYNC_EVENT, onSync);
+    return () => window.removeEventListener(SYNC_EVENT, onSync);
+  }, [load]);
 
   useEffect(() => {
     void load();
@@ -87,7 +110,7 @@ export function UnifiedDashboard({
     return () => window.removeEventListener("hashchange", fromHash);
   }, []);
 
-  // 다른 부서가 저장한 값도 보이도록 — 창으로 돌아올 때 + 1분마다
+  // 실시간 반영(접속 신호)이 놓친 경우를 위한 보조 — 창으로 돌아올 때 + 1분마다
   useEffect(() => {
     const onFocus = () => void load();
     window.addEventListener("focus", onFocus);
@@ -139,13 +162,12 @@ export function UnifiedDashboard({
           <h1>{year} 요기코퍼레이션 통합 예산</h1>
         </div>
         <div className="header-side no-print">
-          <span className="conn" title={health?.database.error}>
-            <span className={`dot ${conn.dot}`} />
-            {conn.label}
-          </span>
-          <span className={`chip${health?.onlineData.configured ? " saved" : ""}`} title={health ? `onlineData MCP · ${health.onlineData.host}` : undefined}>
-            매출 실적 MCP {health ? (health.onlineData.configured ? "연결 설정됨" : "토큰 미설정") : "…"}
-          </span>
+          {(conn.dot === "err" || conn.dot === "warn") && (
+            <span className="conn" title={health?.database.error}>
+              <span className={`dot ${conn.dot}`} />
+              {conn.label}
+            </span>
+          )}
           <select
             aria-label="부서 화면 열기"
             value=""
@@ -162,12 +184,15 @@ export function UnifiedDashboard({
           </select>
           <button
             type="button"
+            className="icon-button"
+            aria-label="새로고침"
+            title="새로고침 — 다른 화면에서 저장한 최신 자료 불러오기"
             onClick={async () => {
               await load();
               notify("최신 자료를 불러왔습니다.");
             }}
           >
-            새로고침
+            ↻
           </button>
           <UserMenu viewer={viewer} />
         </div>
@@ -182,7 +207,9 @@ export function UnifiedDashboard({
           </span>
         ))}
       </nav>
-      <main className="page">
+      <main className="page" data-anchor={`main:${tab}`}>
+        {/* 부서 탭은 그 부서 화면(/dept/코드)과 같은 자료라 같은 화면으로 본다 */}
+        <PresenceLayer page={deptMeta ? `dept:${deptMeta.code}` : "unified"} where={`통합 · ${tabs.find((t) => t.key === tab)?.label ?? ""}`} />
         {error && (
           <div className="banner err">
             <span>{error}</span>
@@ -217,16 +244,17 @@ export function UnifiedDashboard({
             )}
             {tab === "budget" && <BudgetOverview year={year} departments={departments} onSelect={(code) => choose(`dept-${code}`)} onImported={() => void load()} />}
             {tab === "pnl" && (
-              <PnlOverview year={year} prevYear={prevYear} departments={departments} channels={channels} plan={plan} pnlPrior={pnlPrior} onPlanSaved={setPlan} />
+              <PnlOverview year={year} prevYear={prevYear} departments={departments} channels={channels} plan={plan} pnlPrior={pnlPrior} onPlanSaved={setPlan} viewer={viewer} />
             )}
             {tab === "personnel" && <PersonnelOverview year={year} departments={departments} />}
             {deptMeta && <DeptLedgerTab key={deptMeta.code} meta={deptMeta} year={year} onSaved={onDeptSaved} viewer={viewer} />}
             {tab === "backdata" && <BackdataOverview departments={departments} />}
+            {tab === "visibility" && <AccountVisibilityPanel metas={metas} departments={departments} />}
             {tab === "accounts" && <AccountsPanel year={year} />}
           </>
         )}
         <p className="muted no-print" style={{ marginTop: 24 }}>
-          부서 화면에서 저장한 값이 바로 합산됩니다 · 1분마다 자동 갱신{syncedAt ? ` · 마지막 갱신 ${formatTime(syncedAt)}` : ""}
+          부서 화면에서 저장한 값이 몇 초 안에 자동으로 합산됩니다{syncedAt ? ` · 마지막 갱신 ${formatTime(syncedAt)}` : ""}
         </p>
       </main>
     </>

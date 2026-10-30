@@ -3,10 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { departmentStatus } from "@/lib/budget";
 import { api, type ApiError } from "@/lib/client";
-import { SECTION_FIELD, type DepartmentDoc, type Section } from "@/lib/types";
+import { SECTIONS, SECTION_FIELD, type DepartmentDoc, type DeptRevisionInfo, type Section, type SyncInfo } from "@/lib/types";
+import { SYNC_EVENT } from "../components/Presence";
 
 export type SaveState = "idle" | "pending" | "saving" | "saved" | "error" | "conflict";
 type FieldOf<S extends Section> = DepartmentDoc[(typeof SECTION_FIELD)[S]];
+
+const SECTION_NAME: Record<Section, string> = { accounts: "계정별 예산", personnel: "인원정보", sales: "목표매출" };
 
 const SAVE_DELAY = 700;
 const RETRY_DELAY = 5000;
@@ -15,13 +18,16 @@ const RETRY_DELAY = 5000;
  * 부서 문서 하나를 불러와 고치고 자동 저장한다.
  *   - 구역(계정·인원·목표매출)마다 저장 번호를 같이 보내서, 그 사이 다른 화면이 저장했으면 409 → 충돌 안내(덮어쓰지 않음)
  *   - 저장 중에 더 고친 내용은 응답 뒤 이어서 저장
+ *   - 다른 화면이 저장하면(접속 신호의 저장 번호) 그 구역만 바로 받아 온다 — 내가 고치는 중인 구역은 건드리지 않음
  */
-export function useDepartment(code: string, options: { onSaved?: () => void } = {}) {
+export function useDepartment(code: string, options: { onSaved?: () => void; team?: boolean } = {}) {
   const [doc, setDoc] = useState<DepartmentDoc | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<{ sections: Section[]; server: DepartmentDoc } | null>(null);
+  const [adminNotice, setAdminNotice] = useState<string | null>(null); // 경영지원 값으로 맞춘 구역 안내
+  const team = Boolean(options.team);
 
   const docRef = useRef<DepartmentDoc | null>(null);
   const dirty = useRef(new Set<Section>());
@@ -54,6 +60,45 @@ export function useDepartment(code: string, options: { onSaved?: () => void } = 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // 다른 화면이 저장한 구역만 받아 온다. 내가 고치는 중(저장 대기·저장 중·충돌)인 구역은 그대로 → 저장 때 충돌 안내
+  const syncing = useRef(false);
+  const pull = useCallback(
+    async (remote: DeptRevisionInfo) => {
+      const current = docRef.current;
+      if (!current || syncing.current || inflight.current) return;
+      const newer = SECTIONS.filter((s) => remote.revisions[s] > current.revisions[s] && !dirty.current.has(s));
+      if (!newer.length && remote.closed === current.closed) return;
+      syncing.current = true;
+      try {
+        const { department } = await api<{ department: DepartmentDoc }>(`/api/departments/${code}`);
+        if (inflight.current) return; // 그 사이 저장이 시작됐으면 다음 신호 때 다시
+        const latest = docRef.current ?? current;
+        const next: DepartmentDoc = { ...latest, closed: department.closed, closedAt: department.closedAt, savedAt: department.savedAt, updatedAt: department.updatedAt, revisions: { ...latest.revisions } };
+        for (const s of SECTIONS) {
+          if (department.revisions[s] <= latest.revisions[s] || dirty.current.has(s)) continue;
+          const field = SECTION_FIELD[s];
+          (next as unknown as Record<string, unknown>)[field] = department[field];
+          next.revisions[s] = department.revisions[s];
+        }
+        commit(next);
+      } catch {
+        // 다음 신호 때 다시
+      } finally {
+        syncing.current = false;
+      }
+    },
+    [code, commit],
+  );
+
+  useEffect(() => {
+    const onSync = (e: Event) => {
+      const remote = (e as CustomEvent<SyncInfo>).detail.depts[code];
+      if (remote) void pull(remote);
+    };
+    window.addEventListener(SYNC_EVENT, onSync);
+    return () => window.removeEventListener(SYNC_EVENT, onSync);
+  }, [code, pull]);
 
   const flushRef = useRef<() => Promise<boolean>>(async () => true);
   const schedule = useCallback((delay: number) => {
@@ -88,7 +133,24 @@ export function useDepartment(code: string, options: { onSaved?: () => void } = 
       const err = e as ApiError;
       const server = err.body?.department as DepartmentDoc | undefined;
       sections.forEach((s) => dirty.current.add(s));
-      if (err.status === 409 && server) {
+      if (err.status === 409 && server && team && sections.some((s) => server.savedBy?.[s] === "admin")) {
+        // 통합예산(경영지원) 우선 — 경영지원이 먼저 저장한 구역은 그 값으로 맞추고, 나머지 구역은 이어서 저장
+        const adopted = sections.filter((s) => server.savedBy?.[s] === "admin");
+        const latest = docRef.current ?? current;
+        const next: DepartmentDoc = { ...latest, revisions: { ...latest.revisions }, closed: server.closed, closedAt: server.closedAt };
+        for (const s of SECTIONS) {
+          if (!adopted.includes(s) && server.revisions[s] === latest.revisions[s]) continue;
+          if (adopted.includes(s) || !dirty.current.has(s)) {
+            (next as unknown as Record<string, unknown>)[SECTION_FIELD[s]] = server[SECTION_FIELD[s]];
+            next.revisions[s] = server.revisions[s];
+            dirty.current.delete(s);
+          }
+        }
+        commit(next);
+        setAdminNotice(`경영지원이 통합예산에서 먼저 수정한 ${adopted.map((s) => SECTION_NAME[s]).join(", ")} 값으로 맞췄습니다. 이 화면에서 방금 바꾼 내용은 저장되지 않았으니 필요하면 다시 입력해 주세요.`);
+        setSaveState(dirty.current.size ? "pending" : "saved");
+        if (dirty.current.size) schedule(300);
+      } else if (err.status === 409 && server) {
         blocked.current = true;
         setConflict({ sections, server });
         setSaveState("conflict");
@@ -195,7 +257,7 @@ export function useDepartment(code: string, options: { onSaved?: () => void } = 
             ? "저장 실패"
             : departmentStatus(doc);
 
-  return { doc, loadError, saveState, saveError, conflict, statusLabel, update, saveNow, reload: load, resolveConflict, setClosed };
+  return { doc, loadError, saveState, saveError, conflict, statusLabel, update, saveNow, reload: load, resolveConflict, setClosed, adminNotice, dismissAdminNotice: () => setAdminNotice(null) };
 }
 
 export type DepartmentState = ReturnType<typeof useDepartment>;

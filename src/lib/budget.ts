@@ -27,6 +27,9 @@ export const salesMonths = (rows: SalesRow[]) => MONTHS.map((_, m) => rows.reduc
 export const personnelMonths = (rows: { values: number[] }[]) =>
   MONTHS.map((_, m) => rows.reduce((s, r) => s + (r.values[m] || 0), 0));
 
+// 경영지원 전용 계정 — 전 줄이 '경영지원 입력'(직원급여·퇴직급여·세금과공과금 등). 팀에는 금액을 보내지 않고, 경영지원도 비밀번호를 한 번 더 넣어야 보임
+export const isSensitiveAccount = (account: BudgetAccount) => account.rows.length > 0 && account.rows.every((r) => r.locked);
+
 export const filledAccountCount = (accounts: BudgetAccount[]) =>
   accounts.filter((a) => a.rows.some((r) => r.values.some((v) => v !== 0))).length;
 

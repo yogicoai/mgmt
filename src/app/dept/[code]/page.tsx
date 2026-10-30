@@ -4,7 +4,9 @@ import { DeptDashboard } from "@/components/dept/DeptDashboard";
 import reference from "@/data/reference.json";
 import { homeOf } from "@/lib/auth/accounts";
 import { currentAccount } from "@/lib/auth/guard";
-import { BUDGET_YEAR, findDeptMeta } from "@/lib/templates";
+import { MASTER_ID } from "@/lib/auth/local";
+import { kindOf } from "@/lib/budget";
+import { BUDGET_YEAR, channels, findDeptMeta } from "@/lib/templates";
 
 type Props = { params: Promise<{ code: string }> };
 
@@ -29,7 +31,8 @@ export default async function DepartmentPage({ params }: Props) {
       reference={reference}
       year={BUDGET_YEAR}
       prevYear={BUDGET_YEAR - 1}
-      viewer={{ loginId: account.loginId, deptName: account.deptName, isAdmin: account.role === "admin" }}
+      salesKinds={channels.map(kindOf)}
+      viewer={{ loginId: account.loginId, deptName: account.deptName, isAdmin: account.role === "admin", master: account._id === MASTER_ID }}
     />
   );
 }

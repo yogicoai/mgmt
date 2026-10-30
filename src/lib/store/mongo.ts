@@ -1,6 +1,6 @@
 import "server-only";
 import { Binary, MongoClient, ObjectId, type Db } from "mongodb";
-import type { AttachmentMeta, DepartmentDoc, LoginAccount, RevenuePlan, ReviewComment } from "../types";
+import type { AccountVisibility, AttachmentMeta, DepartmentDoc, DeptRevisionInfo, LoginAccount, PresenceEntry, RevenuePlan, ReviewComment } from "../types";
 import type { BudgetStore, DeptPatch, PatchOptions, PatchResult } from "./types";
 
 // 개발 서버가 코드 변경마다 모듈을 다시 읽어도 연결은 하나만 쓰도록 전역에 보관
@@ -32,6 +32,8 @@ async function db(): Promise<Db> {
     database.collection("attachments").createIndex({ year: 1, deptCode: 1, uploadedAt: 1 }),
     database.collection("accounts").createIndex({ loginId: 1 }, { unique: true }),
     database.collection("reviews").createIndex({ year: 1, deptCode: 1, createdAt: 1 }),
+    database.collection("presence").createIndex({ page: 1, at: 1 }),
+    database.collection("presence").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }), // 1분 지나면 Mongo 가 지움
   ]).catch(() => (indexesReady = null));
   return database;
 }
@@ -58,6 +60,8 @@ const plans = async () => (await db()).collection<RevenuePlan>("revenue_plans");
 const cache = async () => (await db()).collection<{ _id: string; data: unknown; fetchedAt: string }>("cache");
 const accounts = async () => (await db()).collection<LoginAccount>("accounts");
 const reviews = async () => (await db()).collection<ReviewComment>("reviews");
+const presence = async () => (await db()).collection<PresenceEntry & { expiresAt: Date }>("presence");
+const settings = async () => (await db()).collection<AccountVisibility>("settings");
 
 export const mongoStore: BudgetStore = {
   kind: "mongo",
@@ -70,6 +74,12 @@ export const mongoStore: BudgetStore = {
     return (await departments()).findOne({ _id: `${year}:${code}` });
   },
 
+  async departmentRevisions(year, code) {
+    const filter = code ? { _id: `${year}:${code}` } : { year };
+    const docs = await (await departments()).find(filter, { projection: { code: 1, revisions: 1, closed: 1 } }).toArray();
+    return docs.map((d): DeptRevisionInfo => ({ code: d.code, revisions: d.revisions, closed: Boolean(d.closed) }));
+  },
+
   async insertDepartment(doc) {
     await (await departments()).updateOne({ _id: doc._id }, { $setOnInsert: doc }, { upsert: true });
   },
@@ -79,15 +89,17 @@ export const mongoStore: BudgetStore = {
     const _id = `${year}:${code}`;
     const filter: Record<string, unknown> = { _id };
     const inc: Record<string, number> = {};
+    const by: Record<string, string> = {};
     for (const [section, revision] of Object.entries(expected)) {
       filter[`revisions.${section}`] = revision;
       inc[`revisions.${section}`] = 1;
+      if (options.by) by[`savedBy.${section}`] = options.by;
     }
     if (!options.allowClosed) filter.closed = false;
     const now = new Date().toISOString();
     const updated = await col.findOneAndUpdate(
       filter,
-      { $set: { ...patch, updatedAt: now, ...(options.markSaved ? { savedAt: now } : {}) }, $inc: inc },
+      { $set: { ...patch, ...by, updatedAt: now, ...(options.markSaved ? { savedAt: now } : {}) }, $inc: inc },
       { returnDocument: "after" },
     );
     if (updated) return { ok: true, doc: updated };
@@ -209,5 +221,38 @@ export const mongoStore: BudgetStore = {
 
   async deleteReview(id) {
     return (await (await reviews()).deleteOne({ _id: id })).deletedCount === 1;
+  },
+
+  async getVisibility(year) {
+    return (await settings()).findOne({ _id: `${year}:visibility` });
+  },
+
+  async saveVisibility(year, expectedRevision, hidden) {
+    const col = await settings();
+    const _id = `${year}:visibility`;
+    const updatedAt = new Date().toISOString();
+    if (expectedRevision === 0) {
+      const doc: AccountVisibility = { _id, year, hidden, revision: 1, updatedAt };
+      try {
+        await col.insertOne(doc);
+        return { ok: true, doc };
+      } catch {
+        return { ok: false, doc: await col.findOne({ _id }) }; // 이미 누가 만들었음
+      }
+    }
+    const doc = await col.findOneAndUpdate({ _id, revision: expectedRevision }, { $set: { hidden, updatedAt }, $inc: { revision: 1 } }, { returnDocument: "after" });
+    return doc ? { ok: true, doc } : { ok: false, doc: await col.findOne({ _id }) };
+  },
+
+  async putPresence(entry) {
+    await (await presence()).replaceOne({ _id: entry._id }, { ...entry, expiresAt: new Date(entry.at + 60_000) }, { upsert: true });
+  },
+
+  async listPresence(page, since) {
+    return (await presence()).find({ page, at: { $gte: since } }, { projection: { expiresAt: 0 } }).toArray();
+  },
+
+  async dropPresence(id) {
+    await (await presence()).deleteOne({ _id: id });
   },
 };

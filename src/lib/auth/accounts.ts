@@ -54,7 +54,7 @@ export async function ensureAccounts(): Promise<LoginAccount[]> {
 }
 
 export function toPublic(account: LoginAccount): PublicAccount {
-  const { passwordHash, ...rest } = account;
+  const { passwordHash, viewPasswordHash: _view, ...rest } = account;
   return { ...rest, hasPassword: Boolean(passwordHash) };
 }
 

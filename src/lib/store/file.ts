@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { AttachmentMeta, DepartmentDoc, LoginAccount, RevenuePlan, ReviewComment } from "../types";
+import type { AccountVisibility, AttachmentMeta, DepartmentDoc, LoginAccount, PresenceEntry, RevenuePlan, ReviewComment } from "../types";
 import type { BudgetStore, PatchResult } from "./types";
 
 // MONGODB_URI 가 비어 있을 때 쓰는 시험용 저장소 — .local/dev-db 안의 JSON 파일.
@@ -17,6 +17,7 @@ type Tables = {
   cache: Record<string, { data: unknown; fetchedAt: string }>;
   accounts: Record<string, LoginAccount>;
   reviews: Record<string, ReviewComment>;
+  settings: Record<string, AccountVisibility>;
 };
 
 const globalForFile = globalThis as unknown as { __budgetFileQueue?: Promise<unknown> };
@@ -65,6 +66,9 @@ const update = <K extends keyof Tables, T>(table: K, change: (value: Tables[K]) 
 
 const clone = <T>(v: T): T => structuredClone(v);
 
+// 접속 신호는 짧게 살아 있는 값이라 파일에 쓰지 않고 메모리에만
+const presenceMemory = new Map<string, PresenceEntry>();
+
 export const fileStore: BudgetStore = {
   kind: "file",
 
@@ -74,6 +78,12 @@ export const fileStore: BudgetStore = {
 
   async getDepartment(year, code) {
     return (await read("departments"))[`${year}:${code}`] ?? null;
+  },
+
+  async departmentRevisions(year, code) {
+    return Object.values(await read("departments"))
+      .filter((d) => d.year === year && (!code || d.code === code))
+      .map((d) => ({ code: d.code, revisions: d.revisions, closed: Boolean(d.closed) }));
   },
 
   async insertDepartment(doc) {
@@ -91,7 +101,10 @@ export const fileStore: BudgetStore = {
         if (doc.revisions[section as keyof DepartmentDoc["revisions"]] !== revision) return { ok: false, reason: "conflict", doc: clone(doc) };
       }
       Object.assign(doc, clone(patch));
-      for (const section of Object.keys(expected)) doc.revisions[section as keyof DepartmentDoc["revisions"]] += 1;
+      for (const section of Object.keys(expected)) {
+        doc.revisions[section as keyof DepartmentDoc["revisions"]] += 1;
+        if (options.by) doc.savedBy = { ...(doc.savedBy ?? {}), [section]: options.by };
+      }
       const now = new Date().toISOString();
       doc.updatedAt = now;
       if (options.markSaved) doc.savedAt = now;
@@ -244,5 +257,34 @@ export const fileStore: BudgetStore = {
       delete all[id];
       return found;
     });
+  },
+
+  async getVisibility(year) {
+    const doc = (await read("settings"))[`${year}:visibility`];
+    return doc ? clone(doc) : null;
+  },
+
+  async saveVisibility(year, expectedRevision, hidden) {
+    return update("settings", (all) => {
+      const _id = `${year}:visibility`;
+      const current = all[_id];
+      if ((current?.revision ?? 0) !== expectedRevision) return { ok: false, doc: current ? clone(current) : null };
+      const doc: AccountVisibility = { _id, year, hidden, revision: expectedRevision + 1, updatedAt: new Date().toISOString() };
+      all[_id] = doc;
+      return { ok: true, doc: clone(doc) };
+    });
+  },
+
+  async putPresence(entry) {
+    presenceMemory.set(entry._id, entry);
+  },
+
+  async listPresence(page, since) {
+    for (const [id, e] of presenceMemory) if (e.at < Date.now() - 60_000) presenceMemory.delete(id);
+    return [...presenceMemory.values()].filter((e) => e.page === page && e.at >= since);
+  },
+
+  async dropPresence(id) {
+    presenceMemory.delete(id);
   },
 };

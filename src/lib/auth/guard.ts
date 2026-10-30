@@ -1,13 +1,15 @@
 import "server-only";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import type { NextResponse } from "next/server";
 import { getStore } from "../store";
 import type { LoginAccount } from "../types";
+import { MASTER, isLocalMaster } from "./local";
 import { SESSION_COOKIE, SESSION_HOURS, readCookie, signSession, verifySession } from "./session";
 
 // 권한 규칙
 //   경영지원(admin): 통합예산·모든 부서·계정 관리
 //   부서(dept): 자기 부서 문서·첨부만
+//   로컬 마스터: 이 PC 개발 서버에서 로그인 안 했을 때 경영지원 권한으로(local.ts)
 export class AuthError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -26,8 +28,9 @@ async function accountFromToken(token: string | null | undefined): Promise<Login
 
 export async function requireUser(request: Request) {
   const account = await accountFromToken(readCookie(request.headers.get("cookie")));
-  if (!account) throw new AuthError("로그인이 필요합니다.", 401);
-  return account;
+  if (account) return account;
+  if (isLocalMaster(request.headers)) return MASTER;
+  throw new AuthError("로그인이 필요합니다.", 401);
 }
 
 export async function requireAdmin(request: Request) {
@@ -44,7 +47,9 @@ export async function requireDept(request: Request, code: string) {
 
 // 서버 컴포넌트(페이지)용
 export async function currentAccount() {
-  return accountFromToken((await cookies()).get(SESSION_COOKIE)?.value);
+  const account = await accountFromToken((await cookies()).get(SESSION_COOKIE)?.value);
+  if (account) return account;
+  return isLocalMaster(await headers()) ? MASTER : null;
 }
 
 export function setSessionCookie(response: NextResponse, account: LoginAccount, request: Request) {

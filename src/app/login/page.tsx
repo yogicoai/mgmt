@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { LoginForm } from "@/components/LoginForm";
 import { homeOf } from "@/lib/auth/accounts";
 import { currentAccount } from "@/lib/auth/guard";
+import { MASTER_ID } from "@/lib/auth/local";
 import { BUDGET_YEAR } from "@/lib/templates";
 
 export const metadata: Metadata = { title: `로그인 · ${BUDGET_YEAR} 요기코퍼레이션 예산` };
@@ -18,7 +19,7 @@ export default async function LoginPage({ searchParams }: Props) {
     <LoginForm
       year={BUDGET_YEAR}
       next={safeNext}
-      current={account ? { deptName: account.deptName, loginId: account.loginId, home: homeOf(account) } : null}
+      current={account && account._id !== MASTER_ID ? { deptName: account.deptName, loginId: account.loginId, home: homeOf(account) } : null}
     />
   );
 }
