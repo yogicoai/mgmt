@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { MONTHS, channelTotals, isSensitiveAccount, money, percent, revenueMetrics, sum } from "@/lib/budget";
 import { downloadCsv } from "@/lib/client";
 import type { Channel, DepartmentDoc, PnlPrior, RevenuePlan } from "@/lib/types";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { UnlockDialog, useSensitiveAccess } from "../SensitiveGate";
 import { StatCard, type Viewer } from "../ui";
 import { PlanRowDialog } from "./PlanRowDialog";
@@ -40,6 +41,8 @@ export function PnlOverview({
   viewer: Viewer;
 }) {
   const [cogsIndex, setCogsIndex] = useState<number | null>(null);
+  // 1760px 보다 좁으면 전년은 당해 칸 아래 줄, 증감률은 증감 칸 아래 줄로 — 가로 한 화면 안에
+  const compact = useMediaQuery("(max-width: 1760px)");
   // 급여 등 경영지원 전용 계정 줄은 비밀번호 확인 전 가림
   const sensitive = useSensitiveAccess({ isAdmin: viewer.isAdmin, master: viewer.master });
   const [unlocking, setUnlocking] = useState(false);
@@ -128,13 +131,22 @@ export function PnlOverview({
           </span>
         </div>
         <div className="tablewrap free">
-          <table className="pnl-table">
+          <table className="pnl-table fit-table">
             <colgroup>
-              <col style={{ width: 160 }} />
-              <col style={{ width: 120 }} />
-              <col style={{ width: 120 }} />
-              <col style={{ width: 115 }} />
-              <col style={{ width: 70 }} />
+              <col style={{ width: "9%" }} />
+              {compact ? (
+                <>
+                  <col style={{ width: "8.4%" }} />
+                  <col style={{ width: "7.8%" }} />
+                </>
+              ) : (
+                <>
+                  <col style={{ width: "7.2%" }} />
+                  <col style={{ width: "7.2%" }} />
+                  <col style={{ width: "7%" }} />
+                  <col style={{ width: "4.6%" }} />
+                </>
+              )}
               {MONTHS.map((m) => (
                 <col key={m} />
               ))}
@@ -142,10 +154,25 @@ export function PnlOverview({
             <thead>
               <tr>
                 <th>구분</th>
-                <th>{prevYear}</th>
-                <th>{year}</th>
-                <th>증감</th>
-                <th>증감률</th>
+                {compact ? (
+                  <>
+                    <th>
+                      {year}
+                      <span className="sub-line">{prevYear}</span>
+                    </th>
+                    <th>
+                      증감
+                      <span className="sub-line">증감률</span>
+                    </th>
+                  </>
+                ) : (
+                  <>
+                    <th>{prevYear}</th>
+                    <th>{year}</th>
+                    <th>증감</th>
+                    <th>증감률</th>
+                  </>
+                )}
                 {MONTHS.map((m) => (
                   <th key={m}>{m}</th>
                 ))}
@@ -161,7 +188,7 @@ export function PnlOverview({
                       <td>
                         {r.label} <span className="lock-chip">🔒</span>
                       </td>
-                      {Array.from({ length: 4 + MONTHS.length }, (_, i) => (
+                      {Array.from({ length: (compact ? 2 : 4) + MONTHS.length }, (_, i) => (
                         <td key={i} className="masked-cell">
                           •••
                         </td>
@@ -179,12 +206,27 @@ export function PnlOverview({
                         r.label
                       )}
                     </td>
-                    <td className="muted">{r.prior === null ? "" : money(r.prior)}</td>
-                    <td>
-                      <b>{money(now)}</b>
-                    </td>
-                    <td className={r.prior !== null && now - r.prior < 0 ? "neg" : undefined}>{r.prior === null ? "" : money(now - r.prior)}</td>
-                    <td className={c !== null && c < 0 ? "neg" : undefined}>{r.prior === null ? "" : percent(c)}</td>
+                    {compact ? (
+                      <>
+                        <td>
+                          <b>{money(now)}</b>
+                          {r.prior !== null && <span className="sub-line">{money(r.prior)}</span>}
+                        </td>
+                        <td className={r.prior !== null && now - r.prior < 0 ? "neg" : undefined}>
+                          {r.prior === null ? "" : money(now - r.prior)}
+                          {r.prior !== null && <span className={`sub-line${c !== null && c < 0 ? " neg" : ""}`}>{percent(c)}</span>}
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="muted">{r.prior === null ? "" : money(r.prior)}</td>
+                        <td>
+                          <b>{money(now)}</b>
+                        </td>
+                        <td className={r.prior !== null && now - r.prior < 0 ? "neg" : undefined}>{r.prior === null ? "" : money(now - r.prior)}</td>
+                        <td className={c !== null && c < 0 ? "neg" : undefined}>{r.prior === null ? "" : percent(c)}</td>
+                      </>
+                    )}
                     {r.months.map((v, m) => (
                       <td key={m} className={v < 0 ? "neg" : undefined}>
                         {money(v)}

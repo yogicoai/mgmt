@@ -199,16 +199,16 @@ export function AccountDetailDialog({
           </div>
         )}
         <div className="tablewrap">
-          <table className="detail-table">
+          <table className="detail-table fit-table">
             <colgroup>
-              <col style={{ width: managing ? "6.5%" : "7%" }} />
-              <col style={{ width: managing ? "9.5%" : "10%" }} />
+              <col style={{ width: managing ? "6.3%" : "7%" }} />
+              <col style={{ width: managing ? "9%" : "9.5%" }} />
               {MONTHS.map((m) => (
-                <col key={m} style={{ width: managing ? "5.7%" : "6%" }} />
+                <col key={m} style={{ width: managing ? "5.55%" : "5.9%" }} />
               ))}
-              <col style={{ width: managing ? "6%" : "6.5%" }} />
-              <col style={{ width: "4.5%" }} />
-              {managing && <col style={{ width: "5.1%" }} />}
+              <col style={{ width: managing ? "6.4%" : "6.8%" }} />
+              <col style={{ width: managing ? "5.6%" : "5.9%" }} />
+              {managing && <col style={{ width: "6.1%" }} />}
             </colgroup>
             <thead>
               <tr>

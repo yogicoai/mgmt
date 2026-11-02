@@ -75,12 +75,19 @@ export function BudgetOverview({ year, departments, onSelect, onImported }: { ye
           <span className="muted">단위: 원</span>
         </div>
         <div className="tablewrap free">
-          <table style={{ minWidth: 1250 }}>
+          <table className="overview-table fit-table">
+            <colgroup>
+              <col style={{ width: "8.5%" }} />
+              <col style={{ width: "8.5%" }} />
+              <col style={{ width: "8.5%" }} />
+              {MONTHS.map((m) => (
+                <col key={m} />
+              ))}
+            </colgroup>
             <thead>
               <tr>
                 <th>부서</th>
-                <th>상태</th>
-                <th>검토 의견</th>
+                <th>상태 · 검토 의견</th>
                 <th>연간 합계</th>
                 {MONTHS.map((m) => (
                   <th key={m}>{m}</th>
@@ -97,17 +104,13 @@ export function BudgetOverview({ year, departments, onSelect, onImported }: { ye
                         {doc.name}
                       </button>
                     </td>
-                    <td>
+                    <td className="status-cell">
                       <span className={`badge${status === "마감 완료" ? " closed" : status === "저장 완료" ? " saved" : ""}`}>{status}</span>
-                    </td>
-                    <td>
                       {reviewCounts[doc.code]?.total ? (
-                        <button type="button" className="link" onClick={() => onSelect(doc.code)} title={`전체 ${reviewCounts[doc.code].total}건`}>
+                        <button type="button" className="link" onClick={() => onSelect(doc.code)} title={`검토 의견 전체 ${reviewCounts[doc.code].total}건`}>
                           {reviewCounts[doc.code].open ? <span className="badge warn">반영 필요 {reviewCounts[doc.code].open}</span> : <span className="badge saved">모두 반영</span>}
                         </button>
-                      ) : (
-                        <span className="muted">—</span>
-                      )}
+                      ) : null}
                     </td>
                     <td>
                       <b>{money(sum(m))}</b>
@@ -121,7 +124,7 @@ export function BudgetOverview({ year, departments, onSelect, onImported }: { ye
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={3}>전체 합계</td>
+                <td colSpan={2}>전체 합계</td>
                 <td>{money(total)}</td>
                 {months.map((v, i) => (
                   <td key={i}>{money(v)}</td>

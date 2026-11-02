@@ -10,6 +10,7 @@ export interface DeptPatch {
 export interface PlanPatch {
   fees?: FeeRow[];
   cogs?: FeeRow[];
+  rowOrder?: Record<string, string[]>;
 }
 
 export interface PatchOptions {

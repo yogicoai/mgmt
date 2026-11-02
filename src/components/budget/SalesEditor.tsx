@@ -37,14 +37,14 @@ export function SalesEditor({
 
   return (
     <div className="tablewrap free">
-      <table className="sales-table">
+      <table className="sales-table fit-table">
         <colgroup>
-          <col style={{ width: 150 }} />
+          <col style={{ width: editable ? "9.4%" : "10%" }} />
           {MONTHS.map((m) => (
             <col key={m} />
           ))}
-          <col style={{ width: 120 }} />
-          {editable && <col style={{ width: 60 }} />}
+          <col style={{ width: editable ? "9.4%" : "9.6%" }} />
+          {editable && <col style={{ width: "5.6%" }} />}
         </colgroup>
         <thead>
           <tr>

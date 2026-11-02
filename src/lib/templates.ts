@@ -15,8 +15,9 @@ const deptTemplates = templates.departments as DeptTemplate[];
 
 export const BUDGET_YEAR = Number(process.env.BUDGET_YEAR || templates.year);
 
-// 숨김 부서 — 공통(0017)은 일단 쓰지 않음(경영지원 요청, 10/29). 통합 화면 탭·합계·부서 선택·계정 관리·로그인에서 모두 빠진다(DB 문서는 그대로)
-const HIDDEN_DEPTS = new Set(["0017"]);
+// 숨김 부서 — 넣으면 통합 화면 탭·합계·부서 선택·계정 관리·로그인에서 모두 빠진다(DB 문서는 그대로).
+//   공통(0017)은 10/29 숨겼다가 11/02 다시 보이게 함 — 인원현황에서만 뺀다(PersonnelOverview NO_HEADCOUNT)
+const HIDDEN_DEPTS = new Set<string>([]);
 
 // 부서 화면에서 목표매출을 직접 입력하는 부서 — 마케팅·영업·온라인고객지원(경영지원 요청). 나머지는 통합 화면에서 경영지원이 입력
 const SALES_INPUT_DEPTS = new Set(["0004", "0011", "0016"]);

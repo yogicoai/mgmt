@@ -52,5 +52,10 @@ const planRows = z
 
 // 매출 예산안 수수료·매출원가 — 경영지원
 export const planPatchSchema = z
-  .object({ revision: z.number().int().min(0), fees: planRows.optional(), cogs: planRows.optional() })
-  .refine((v) => v.fees || v.cogs, "저장할 내용이 없습니다.");
+  .object({
+    revision: z.number().int().min(0),
+    fees: planRows.optional(),
+    cogs: planRows.optional(),
+    rowOrder: z.record(z.string().regex(/^\d{4}$/), z.array(z.string().max(60)).max(80)).optional(), // 매출 예산안 줄 순서(연도별)
+  })
+  .refine((v) => v.fees || v.cogs || v.rowOrder, "저장할 내용이 없습니다.");

@@ -2,7 +2,6 @@
 import type { BudgetAccount, Channel, DepartmentDoc, FeeRow, SalesRow } from "./types";
 
 export const MONTHS = Array.from({ length: 12 }, (_, i) => `${i + 1}월`);
-export const MONTHS_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export const zeros = () => Array<number>(12).fill(0);
 export const sum = (values: (number | null | undefined)[]) => values.reduce<number>((a, b) => a + (b || 0), 0);

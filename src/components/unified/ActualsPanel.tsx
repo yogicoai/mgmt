@@ -117,7 +117,14 @@ export function ActualsPanel({ year, prevYear, targetOnline, targetOffline }: { 
             }}
           />
           <div className="tablewrap free" style={{ marginTop: 12 }}>
-            <table className="compare-table" style={{ minWidth: 1250 }}>
+            <table className="compare-table fit-table">
+              <colgroup>
+                <col style={{ width: "11%" }} />
+                {MONTHS.map((m) => (
+                  <col key={m} />
+                ))}
+                <col style={{ width: "9.8%" }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th>구분</th>

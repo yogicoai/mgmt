@@ -168,7 +168,14 @@ export function BudgetLedger({
           </div>
         </div>
         <div className="tablewrap">
-          <table className="ledger-table">
+          <table className="ledger-table fit-table">
+            <colgroup>
+              <col style={{ width: "11%" }} />
+              {MONTHS.map((m) => (
+                <col key={m} />
+              ))}
+              <col style={{ width: "7.5%" }} />
+            </colgroup>
             <thead>
               <tr>
                 <th>계정과목</th>

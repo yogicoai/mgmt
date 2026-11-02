@@ -39,6 +39,8 @@ export function PersonnelEditor({
     return current && !base.includes(current) ? [current, ...base] : base;
   };
   const showDelete = canAdd || anyEditable;
+  // 부서명 칸은 좁게(72px) — 온라인고객지원처럼 긴 이름이 있을 때만 그만큼 넓힌다
+  const deptWidth = Math.min(120, Math.max(72, ...rows.map((r) => r.dept.length * 12 + 14)));
   // 위아래 순서 바꾸기 — 영업 계정은 매장 직원 행만 움직인다(본사 인원끼리의 순서는 그대로라 서버 규칙과 맞음)
   const move = (index: number, dir: -1 | 1) =>
     onChange((list) => {
@@ -75,10 +77,10 @@ export function PersonnelEditor({
         <table className="person-table">
           <colgroup>
             {showDelete && <col style={{ width: 62 }} />}
-            <col style={{ width: 64 }} />
-            <col style={{ width: 120 }} />
+            <col style={{ width: 60 }} />
+            <col style={{ width: deptWidth }} />
             {meta.hasStore && <col style={{ width: 130 }} />}
-            <col style={{ width: 130 }} />
+            <col style={{ width: 100 }} />
             <col style={{ width: 96 }} />
             {MONTHS.map((m) => (
               <col key={m} />

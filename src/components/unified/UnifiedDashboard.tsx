@@ -23,6 +23,11 @@ interface Health {
 const REFRESH_MS = 60_000;
 
 // 통합 예산 대시보드 — 부서 문서들을 읽어 실시간 합산(파일 불러오기 없이)
+const SETTINGS = [
+  { key: "visibility", label: "계정과목 노출" },
+  { key: "accounts", label: "계정 관리" },
+];
+
 export function UnifiedDashboard({
   year,
   prevYear,
@@ -56,9 +61,11 @@ export function UnifiedDashboard({
     { key: "personnel", label: "인원현황" },
     ...metas.map((m) => ({ key: `dept-${m.code}`, label: m.name })),
     { key: "backdata", label: "부서별 백데이터" },
-    { key: "visibility", label: "계정과목 노출" },
-    { key: "accounts", label: "계정 관리" },
+    { key: "settings", label: "설정" },
   ];
+  // 설정 탭 안의 소제목 — 주소는 #visibility·#accounts 그대로
+  const settings = SETTINGS.find((t) => t.key === tab);
+  const navKey = settings ? "settings" : tab;
 
   const load = useCallback(async () => {
     try {
@@ -103,7 +110,7 @@ export function UnifiedDashboard({
   useEffect(() => {
     const fromHash = () => {
       const hash = window.location.hash.slice(1);
-      if (hash) setTab(hash);
+      if (hash) setTab(hash === "settings" ? SETTINGS[0].key : hash);
     };
     fromHash();
     window.addEventListener("hashchange", fromHash);
@@ -130,6 +137,7 @@ export function UnifiedDashboard({
   }, [load]);
 
   const choose = (key: string) => {
+    if (key === "settings") key = SETTINGS[0].key;
     setTab(key);
     window.history.replaceState(null, "", `#${key}`);
     window.scrollTo({ top: 0 });
@@ -201,7 +209,7 @@ export function UnifiedDashboard({
         {tabs.map((t, i) => (
           <span key={t.key} style={{ display: "contents" }}>
             {(t.key === `dept-${metas[0]?.code}` || t.key === "backdata") && i > 0 && <span className="tab-sep" aria-hidden="true" />}
-            <button type="button" className={tab === t.key ? "active" : ""} onClick={() => choose(t.key)}>
+            <button type="button" className={navKey === t.key ? "active" : ""} onClick={() => choose(t.key)}>
               {t.label}
             </button>
           </span>
@@ -209,7 +217,7 @@ export function UnifiedDashboard({
       </nav>
       <main className="page" data-anchor={`main:${tab}`}>
         {/* 부서 탭은 그 부서 화면(/dept/코드)과 같은 자료라 같은 화면으로 본다 */}
-        <PresenceLayer page={deptMeta ? `dept:${deptMeta.code}` : "unified"} where={`통합 · ${tabs.find((t) => t.key === tab)?.label ?? ""}`} />
+        <PresenceLayer page={deptMeta ? `dept:${deptMeta.code}` : "unified"} where={`통합 · ${settings ? `설정 · ${settings.label}` : (tabs.find((t) => t.key === tab)?.label ?? "")}`} />
         {error && (
           <div className="banner err">
             <span>{error}</span>
@@ -249,6 +257,15 @@ export function UnifiedDashboard({
             {tab === "personnel" && <PersonnelOverview year={year} departments={departments} />}
             {deptMeta && <DeptLedgerTab key={deptMeta.code} meta={deptMeta} year={year} onSaved={onDeptSaved} viewer={viewer} />}
             {tab === "backdata" && <BackdataOverview departments={departments} />}
+            {settings && (
+              <div className="subtabs no-print" role="tablist" aria-label="설정">
+                {SETTINGS.map((t) => (
+                  <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} className={tab === t.key ? "active" : ""} onClick={() => choose(t.key)}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            )}
             {tab === "visibility" && <AccountVisibilityPanel metas={metas} departments={departments} />}
             {tab === "accounts" && <AccountsPanel year={year} />}
           </>

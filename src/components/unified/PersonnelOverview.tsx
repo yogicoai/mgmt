@@ -17,6 +17,8 @@ export function PersonnelOverview({ year, departments: all }: { year: number; de
   const departments = all.filter((d) => !NO_HEADCOUNT.has(d.code));
   const shown = filter === "all" ? departments : departments.filter((d) => d.code === filter);
   const totals = MONTHS.map((_, m) => shown.reduce((t, d) => t + personnelMonths(d.personnel)[m], 0));
+  // 부서명 / 직급 칸 — 가장 긴 줄이 한 줄에 들어갈 만큼만(부서를 골라도 칸이 흔들리지 않게 전체 기준)
+  const labelWidth = Math.min(260, Math.max(150, ...departments.flatMap((d) => [d.name.length * 12 + 60, ...d.personnel.map((p) => positionLabel(p).length * 11 + 30)])));
 
   const exportCsv = () =>
     downloadCsv(`${year}_인원현황.csv`, [
@@ -53,7 +55,7 @@ export function PersonnelOverview({ year, departments: all }: { year: number; de
         <div className="tablewrap">
           <table className="headcount-table">
             <colgroup>
-              <col style={{ width: 260 }} />
+              <col style={{ width: labelWidth }} />
               <col style={{ width: 100 }} />
               {MONTHS.map((m) => (
                 <col key={m} />

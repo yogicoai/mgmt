@@ -142,6 +142,7 @@ export interface RevenuePlan {
   year: number;
   fees: FeeRow[];
   cogs: FeeRow[]; // 매출원가(제품·상품) — 경영지원 입력, 손익 탭에서 사용
+  rowOrder?: Record<string, string[]>; // 매출 예산안 줄 순서(연도별) — 경영지원이 꾹 눌러 끌어서 바꾼 것
   revision: number;
   updatedAt: string | null;
 }
