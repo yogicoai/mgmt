@@ -54,7 +54,7 @@ export function RevenueOverview({
   const { notify } = useUi();
   // 매출 예산안 — 연도마다 접고 펼친다. 접으면 손익 매출·ERP 매출만(구분 - 2026 손익 - 2026 ERP - 2027 손익 - 2027 ERP)
   const [open, setOpen] = useState<Record<string, boolean>>({});
-  // 구분명 수정·삭제 — [− 구분명 수정/삭제]를 눌러야 줄마다 [수정]·[삭제]가 나타난다
+  // 구분명 수정·삭제 — 위쪽 [수정]을 눌러야 줄마다 [수정]·[삭제]가 나타나고, 끝나면 [저장]
   const [manage, setManage] = useState(false);
   const [renaming, setRenaming] = useState<{ yearKey: string; row: NamedRow } | null>(null);
   const [removing, setRemoving] = useState<{ yearKey: string; row: NamedRow } | null>(null);
@@ -243,7 +243,7 @@ export function RevenueOverview({
               <div className="actions">
                 <span className="muted">
                   단위: 원 · {prevYear}년은 재무 보고 참고값(빨간 글씨는 전망치) ·{" "}
-                  {manage ? "줄 오른쪽의 [수정]·[삭제]를 누르세요 — 다 하면 [완료]" : `연도 옆 ▸로 펼침${anyOpen ? " · 펼친 연도에서 줄 이름을 누른 채 위아래로 끈 뒤 [변경내용 저장] · 수수료 행을 누르면 수정" : ""}`}
+                  {manage ? "줄 오른쪽의 [수정]·[삭제]를 누르세요 — 다 하면 [저장]" : `연도 옆 ▸로 펼침${anyOpen ? " · 펼친 연도에서 줄 이름을 누른 채 위아래로 끈 뒤 [변경내용 저장] · 수수료 행을 누르면 수정" : ""}`}
                 </span>
                 {Object.keys(pending).length > 0 && <OrderSaveBar onSave={() => void saveOrder()} onCancel={() => setPending({})} />}
                 {manage && hiddenCount > 0 && (
@@ -263,15 +263,17 @@ export function RevenueOverview({
                 )}
                 <button
                   type="button"
-                  className={manage ? "" : "danger-solid"}
+                  className="primary"
                   onClick={() => {
-                    if (!manage) setOpen({ [y26]: true, [y27]: true }); // 모든 줄을 고칠 수 있게 펼친다
+                    // 이름 수정·삭제는 창에서 [저장]·[예]를 누를 때 이미 저장된다 — 여기서는 수정 상태를 닫는다
+                    if (manage) notify("저장했습니다.");
+                    else setOpen({ [y26]: true, [y27]: true }); // 모든 줄을 고칠 수 있게 펼친다
                     setManage((v) => !v);
                   }}
                   aria-pressed={manage}
-                  title={manage ? "수정·삭제 끝내기" : "누르면 줄마다 [수정]·[삭제] 버튼이 나타납니다"}
+                  title={manage ? "수정 끝내기" : "구분명 수정·삭제 — 누르면 줄마다 [수정]·[삭제] 버튼이 나타납니다"}
                 >
-                  {manage ? "완료" : "− 구분명 수정/삭제"}
+                  {manage ? "저장" : "수정"}
                 </button>
               </div>
             </div>
