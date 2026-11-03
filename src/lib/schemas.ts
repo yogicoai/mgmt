@@ -50,12 +50,17 @@ const planRows = z
   .array(z.object({ key: z.string().max(50), label: z.string().max(100), values: z.array(amount.refine((v) => v >= 0)).length(12) }))
   .max(30);
 
-// 매출 예산안 수수료·매출원가 — 경영지원
+const yearKey = z.string().regex(/^\d{4}$/);
+
+// 매출 예산안 수수료·매출원가·줄 설정 — 경영지원
 export const planPatchSchema = z
   .object({
     revision: z.number().int().min(0),
     fees: planRows.optional(),
     cogs: planRows.optional(),
-    rowOrder: z.record(z.string().regex(/^\d{4}$/), z.array(z.string().max(60)).max(80)).optional(), // 매출 예산안 줄 순서(연도별)
+    rowOrder: z.record(yearKey, z.array(z.string().max(60)).max(80)).optional(), // 매출 예산안 줄 순서(연도별)
+    rowLabels: z.record(yearKey, z.record(z.string().max(60), z.string().trim().min(1, "구분명을 입력해 주세요.").max(60, "구분명은 60자까지 쓸 수 있습니다."))).optional(), // 구분명(연도별)
+    rowHidden: z.record(yearKey, z.array(z.string().max(60)).max(80)).optional(), // 삭제한 줄(연도별)
+    deptOrder: z.array(z.string().regex(/^\d{4}$/)).max(30).optional(), // 부서별 월별 목표매출의 부서 순서
   })
-  .refine((v) => v.fees || v.cogs || v.rowOrder, "저장할 내용이 없습니다.");
+  .refine((v) => v.fees || v.cogs || v.rowOrder || v.rowLabels || v.rowHidden || v.deptOrder, "저장할 내용이 없습니다.");

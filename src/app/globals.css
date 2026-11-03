@@ -48,12 +48,19 @@ button.danger-solid:hover { background: #a3360a; border-color: #a3360a; }
 button.link { border: 0; background: none; padding: 0; color: var(--blue); font-weight: 700; }
 .button-link { display: inline-flex; align-items: center; border: 1px solid #d7e1e9; background: white; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; color: var(--ink); text-decoration: none; white-space: nowrap; }
 .button-link:hover { background: #f1f7fb; }
-/* 계정과목 노출 */
-.visibility-table { min-width: 1000px; }
+/* 계정과목 노출 — 부서명 줄·계정과목 칸 틀고정(표 안에서 스크롤, 칸 경계가 같이 고정되도록 separate) */
+.visibility-wrap { max-height: max(360px, calc(100vh - 330px)); }
+.visibility-table { min-width: 1000px; border-collapse: separate; border-spacing: 0; }
 .visibility-table th, .visibility-table td { text-align: center; }
-.visibility-table th:first-child, .visibility-table td:first-child { text-align: left; }
-.visibility-table th:first-child { width: 120px; }
+.visibility-table th:first-child, .visibility-table td:first-child { text-align: left; position: sticky; left: 0; box-shadow: inset -1px 0 0 var(--line); }
+.visibility-table th:first-child { width: 120px; z-index: 3; }
+.visibility-table td:first-child { z-index: 1; background: white; }
+.visibility-table tbody tr:nth-child(even) td:first-child { background: #fafcff; }
 .visibility-table th:nth-child(2) { width: 130px; }
+/* 표 안 수정·삭제 글자 버튼 */
+.row-manage { text-align: center !important; white-space: nowrap; }
+.row-manage button { font-size: 11px; margin: 0 3px; }
+.row-manage button.danger { color: var(--danger); }
 .visibility-table td label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer; }
 .visibility-table td label:has(input:disabled) { cursor: not-allowed; }
 .visibility-table td.off { background: #f8fafc; color: var(--muted); }
@@ -261,11 +268,12 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.45); }
 .revenue-report .year-toggle { display: inline-flex; align-items: center; gap: 4px; border: 0; border-radius: 6px; background: none; padding: 4px 5px; font: inherit; font-size: 15px; font-weight: 900; color: #102a54; cursor: pointer; white-space: nowrap; }
 .revenue-report .year-toggle span { font-size: 11px; color: var(--blue); }
 .revenue-report .year-toggle:hover { background: var(--soft); }
-.revenue-report td.label.draggable { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-.revenue-report td.label.draggable::before { content: "⋮⋮"; margin-right: 6px; color: #cbd5e1; font-size: 10px; letter-spacing: -2px; }
-.revenue-report tr.dragging td { background: #fff7ed !important; box-shadow: inset 0 1px 0 #fdba74, inset 0 -1px 0 #fdba74; }
-.revenue-report tr.dragging td.label { cursor: grabbing; }
-.revenue-report.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbing; }
+/* 꾹 눌러 끌어 순서 바꾸기(useLongPressDrag) — 매출 예산안·목표매출·인원정보 */
+td.draggable { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+td.draggable::before { content: "⋮⋮"; margin-right: 6px; color: #cbd5e1; font-size: 10px; letter-spacing: -2px; }
+tr.dragging td, tbody.dragging td { background: #fff7ed !important; box-shadow: inset 0 1px 0 #fdba74, inset 0 -1px 0 #fdba74; }
+tr.dragging td.draggable, tbody.dragging td.draggable { cursor: grabbing; }
+table.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbing; }
 .revenue-report td.label.draggable > button { width: auto; }
 .revenue-report .label button { border: 0; background: none; padding: 0; font-size: 12px; font-weight: 600; color: #102a54; text-align: left; width: 100%; }
 .revenue-report .label button:hover { text-decoration: underline; background: none; }
@@ -286,6 +294,9 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.45); }
 .dept-sales-table .dept-cell { background: #f8fafc !important; vertical-align: top; text-align: left; border-right: 1px solid var(--line-2); }
 .dept-sales-table .dept-cell { white-space: normal; }
 .dept-sales-table .dept-cell b { display: block; color: #102a54; font-size: calc(var(--num-font) + 1px); margin-bottom: 6px; }
+.dept-sales-table .dept-cell.draggable b { display: inline; }
+.dept-sales-table td.kind.draggable::before { margin-right: 4px; }
+.order-save { display: inline-flex; align-items: center; gap: 6px; }
 .dept-sales-table .dept-cell .link { font-size: 11.5px; }
 .dept-sales-table tr.subtotal td { background: #f8fafc; font-weight: 800; border-bottom: 2px solid #e2e8f0; }
 .guide-sales { margin: 12px 0; }
@@ -297,18 +308,22 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.45); }
 .person-table input, .person-table select { width: 100%; font-size: 12px; padding: 6px 5px; text-align: center; text-align-last: center; }
 .person-table .fixed { color: var(--muted); font-weight: 700; }
 .person-table tr.locked td { background: #f8fafc; }
-.move-buttons { display: inline-flex; gap: 3px; }
-.person-table .move-buttons button { width: 24px; padding: 4px 0; font-size: 10px; line-height: 1; }
+.person-table td.draggable + td.draggable::before { content: none; } /* 끄는 표시는 줄 맨 앞 칸에만 */
 .person-table tr.locked input, .person-table tr.locked select { background: #f1f5f9; color: var(--muted); }
-.headcount-table { min-width: 1050px; table-layout: fixed; }
-.headcount-table th, .headcount-table td { border: 1px solid #d9e2ec; padding: 8px; }
-.headcount-table th { background: #deebf7; }
+/* 인원현황 — separate 라야 스크롤할 때 고정된 머리글·합계 줄의 칸 경계가 같이 붙어 있어 틈으로 아래 줄이 비치지 않는다 */
+.headcount-table { min-width: 1050px; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
+.headcount-table th, .headcount-table td { border: solid #d9e2ec; border-width: 0 1px 1px 0; padding: 8px; }
+.headcount-table th { background: #deebf7; border-top-width: 1px; }
+.headcount-table th:first-child, .headcount-table td:first-child { border-left-width: 1px; }
 .headcount-table th:nth-child(-n + 2), .headcount-table td:nth-child(-n + 2) { text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .headcount-table tr.dept td { background: #fff3cc !important; font-weight: 800; color: #102a54; }
+.headcount-table tr.dept td:nth-child(2) { text-align: right; }
+.headcount-table tr.dept a { color: #102a54; }
+.headcount-table tr.dept a:hover { color: var(--blue); }
 .headcount-table tr.person td:nth-child(-n + 2) { background: #e5eff8; }
 .headcount-table tr.person td:first-child { padding-left: 22px; }
 .headcount-table tr.none td { color: #94a3b8; font-size: 11px; background: white; padding-left: 22px; }
-.headcount-table tfoot td { background: #fff3cc; }
+.headcount-table tfoot td { background: #fff3cc; border-top-width: 1px; }
 .headcount-table tfoot td:nth-child(2) { text-align: right; }
 
 /* ── 가이드라인·코드표 ── */
@@ -427,8 +442,8 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.45); }
 .fit-table td { font-size: var(--num-font); }
 .fit-table td:has(> .money-input) { padding-left: 2px; padding-right: 2px; }
 .fit-table .money-input { font-size: var(--num-font); padding-left: 2px; padding-right: 2px; letter-spacing: -0.2px; }
-.overview-table .status-cell { white-space: normal; text-align: left; }
-.overview-table .status-cell .badge { margin: 2px 4px 2px 0; }
+.overview-table th { text-align: center; }
+.overview-table .status-cell { text-align: center; }
 
 @media (max-width: 1200px) {
   .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }

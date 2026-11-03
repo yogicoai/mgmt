@@ -41,6 +41,7 @@ export function DeptDashboard({
   year,
   prevYear,
   salesKinds,
+  salesKindNames,
   viewer,
 }: {
   meta: DeptMeta;
@@ -48,6 +49,7 @@ export function DeptDashboard({
   year: number;
   prevYear: number;
   salesKinds: string[];
+  salesKindNames: Record<string, string>;
   viewer: Viewer;
 }) {
   const { notify } = useUi();
@@ -175,6 +177,7 @@ export function DeptDashboard({
             deptName={meta.name}
             salesRows={doc.salesForecastRows}
             salesKinds={salesKinds}
+            salesKindNames={salesKindNames}
             salesEditable={editable && (viewer.isAdmin || meta.salesInput)}
             onSalesChange={(fn) => update("sales", fn)}
             actuals={actuals}

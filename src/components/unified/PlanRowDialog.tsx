@@ -8,16 +8,16 @@ import { MoneyInput } from "../budget/MoneyInput";
 import { Modal, useUi } from "../ui";
 
 // 매출 예산안의 한 줄(수수료 또는 매출원가) 월별 금액 입력 — 경영지원
-export function PlanRowDialog({ plan, field, index, onSaved, onClose }: { plan: RevenuePlan; field: "fees" | "cogs"; index: number; onSaved: (plan: RevenuePlan) => void; onClose: () => void }) {
+export function PlanRowDialog({ plan, field, index, name, onSaved, onClose }: { plan: RevenuePlan; field: "fees" | "cogs"; index: number; name?: string; onSaved: (plan: RevenuePlan) => void; onClose: () => void }) {
   const { notify } = useUi();
-  const row = plan[field][index];
+  const row = { ...plan[field][index], label: name ?? plan[field][index].label }; // name = 매출 예산안에서 고친 구분명
   const [values, setValues] = useState(row.values.slice());
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
     setBusy(true);
     try {
-      const rows: FeeRow[] = plan[field].map((r, i) => (i === index ? { ...r, values } : r));
+      const rows: FeeRow[] = plan[field].map((r, i) => (i === index ? { ...r, values } : r)); // 저장되는 이름(r.label)은 원본 그대로
       const res = await api<{ plan: RevenuePlan }>("/api/revenue", { method: "PATCH", body: JSON.stringify({ revision: plan.revision, [field]: rows }) });
       onSaved(res.plan);
       notify(`${row.label} 금액을 저장했습니다.`);

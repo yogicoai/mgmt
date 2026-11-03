@@ -1,14 +1,17 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+import { useLongPressDrag } from "@/hooks/useLongPressDrag";
 import { MONTHS, personnelMonths, zeros } from "@/lib/budget";
 import type { DeptMeta, PersonRow } from "@/lib/types";
+import { OrderSaveBar, useUi } from "../ui";
 
 // 인원 입력 권한 — all: 경영지원(전부) / store: 영업 계정(매장 직원 행만) / view: 그 밖의 팀(조회만)
 export type PersonnelScope = "all" | "store" | "view";
 
 const NOTES: Record<PersonnelScope, string> = {
-  all: "신규 채용 계획은 이름에 [모집분야], 예상 채용월에 1을 입력",
-  store: "매장 직원(매니저·부매니저·시니어·서포터·일급제)만 추가·수정할 수 있습니다 — 본사 인원은 경영지원팀에서 입력합니다",
+  all: "신규 채용 계획은 이름에 [모집분야], 예상 채용월에 1을 입력 · 부서코드·부서명 칸을 누른 채 위아래로 끈 뒤 [변경내용 저장]",
+  store: "매장 직원(매니저·부매니저·시니어·서포터·일급제)만 추가·수정할 수 있습니다 — 본사 인원은 경영지원팀에서 입력합니다 · 부서코드·부서명 칸을 누른 채 위아래로 끈 뒤 [변경내용 저장]",
   view: "인원 구성은 경영지원팀에서 입력합니다 — 조회만 가능합니다",
 };
 
@@ -41,15 +44,24 @@ export function PersonnelEditor({
   const showDelete = canAdd || anyEditable;
   // 부서명 칸은 좁게(72px) — 온라인고객지원처럼 긴 이름이 있을 때만 그만큼 넓힌다
   const deptWidth = Math.min(120, Math.max(72, ...rows.map((r) => r.dept.length * 12 + 14)));
-  // 위아래 순서 바꾸기 — 영업 계정은 매장 직원 행만 움직인다(본사 인원끼리의 순서는 그대로라 서버 규칙과 맞음)
-  const move = (index: number, dir: -1 | 1) =>
-    onChange((list) => {
-      const j = index + dir;
-      if (j < 0 || j >= list.length) return list;
-      const next = list.slice();
-      [next[index], next[j]] = [next[j], next[index]];
-      return next;
-    });
+  // 줄 순서 — 부서코드·부서명 칸을 눌러 끈다. 영업 계정은 매장 직원 행만 움직인다(본사 인원끼리의 순서는 그대로라 서버 규칙과 맞음)
+  const { drag, press } = useLongPressDrag();
+  const { notify } = useUi();
+  const body = useRef<HTMLTableSectionElement>(null);
+  // 끌어서 바꾼 순서 — [변경내용 저장]을 눌러야 저장. 줄 번호(저장된 순서의 자리)로 다룬다
+  const [pendingOrder, setPendingOrder] = useState<number[] | null>(null);
+  useEffect(() => setPendingOrder(null), [rows.length]); // 줄 수가 바뀌면 줄 번호가 안 맞으므로 취소
+  const order = (drag ? drag.order.map(Number) : (pendingOrder ?? rows.map((_, i) => i))).filter((i) => rows[i]);
+  const dropOrder = (next: string[]) => {
+    const numbers = next.map(Number);
+    setPendingOrder(numbers.every((n, at) => n === at) ? null : numbers); // 제자리로 돌아오면 저장할 것 없음
+  };
+  const saveOrder = () => {
+    if (!pendingOrder) return;
+    onChange((list) => (list.length === pendingOrder.length ? pendingOrder.map((i) => list[i]) : list));
+    setPendingOrder(null);
+    notify("변경 내용을 저장했습니다.");
+  };
 
   return (
     <section className="panel" data-anchor="personnel">
@@ -57,10 +69,13 @@ export function PersonnelEditor({
         <h3>{"2027년 인원정보"}</h3>
         <div className="actions">
           <span className="muted">{NOTES[scope]}</span>
+          {pendingOrder && <OrderSaveBar onSave={saveOrder} onCancel={() => setPendingOrder(null)} />}
           {canAdd && (
             <button
               type="button"
               className="primary"
+              disabled={Boolean(pendingOrder)}
+              title={pendingOrder ? "변경 내용을 먼저 저장하거나 취소해 주세요" : undefined}
               onClick={() =>
                 onChange((list) => [
                   ...list,
@@ -74,10 +89,9 @@ export function PersonnelEditor({
         </div>
       </div>
       <div className="tablewrap">
-        <table className="person-table">
+        <table className={`person-table${drag ? " is-dragging" : ""}`}>
           <colgroup>
-            {showDelete && <col style={{ width: 62 }} />}
-            <col style={{ width: 60 }} />
+            <col style={{ width: 72 }} />
             <col style={{ width: deptWidth }} />
             {meta.hasStore && <col style={{ width: 130 }} />}
             <col style={{ width: 100 }} />
@@ -89,7 +103,6 @@ export function PersonnelEditor({
           </colgroup>
           <thead>
             <tr>
-              {showDelete && <th>순서</th>}
               <th>부서코드</th>
               <th>부서명</th>
               {meta.hasStore && <th>매장명</th>}
@@ -101,27 +114,26 @@ export function PersonnelEditor({
               {showDelete && <th aria-label="삭제" />}
             </tr>
           </thead>
-          <tbody>
-            {rows.map((r, i) => {
+          <tbody ref={body}>
+            {order.map((i) => {
+              const r = rows[i];
               const rowEditable = canEdit(r);
+              const canDrag = rowEditable && rows.length > 1;
+              const rowPress = canDrag
+                ? {
+                    title: "누른 채 위아래로 끌면 순서가 바뀝니다",
+                    ...press("personnel", String(i), order.map(String), () => [...(body.current?.querySelectorAll<HTMLElement>("tr[data-drag-id]") ?? [])], dropOrder),
+                  }
+                : undefined;
+              const rowClass = [rowEditable || scope === "view" ? "" : "locked", drag?.id === String(i) ? "dragging" : ""].filter(Boolean).join(" ");
               return (
-                <tr key={i} className={rowEditable || scope === "view" ? undefined : "locked"}>
-                  {showDelete && (
-                    <td>
-                      {rowEditable && (
-                        <span className="move-buttons">
-                          <button type="button" aria-label={`${r.name || "인원"} 위로`} disabled={i === 0} onClick={() => move(i, -1)}>
-                            ▲
-                          </button>
-                          <button type="button" aria-label={`${r.name || "인원"} 아래로`} disabled={i === rows.length - 1} onClick={() => move(i, 1)}>
-                            ▼
-                          </button>
-                        </span>
-                      )}
-                    </td>
-                  )}
-                  <td className="fixed">{r.code}</td>
-                  <td className="fixed">{r.dept}</td>
+                <tr key={i} data-drag-id={i} className={rowClass || undefined}>
+                  <td className={`fixed${canDrag ? " draggable" : ""}`} {...rowPress}>
+                    {r.code}
+                  </td>
+                  <td className={`fixed${canDrag ? " draggable" : ""}`} {...rowPress}>
+                    {r.dept}
+                  </td>
                   {meta.hasStore && (
                     <td>
                       <input
@@ -172,6 +184,8 @@ export function PersonnelEditor({
                         <button
                           type="button"
                           className="danger"
+                          disabled={Boolean(pendingOrder)}
+                          title={pendingOrder ? "변경 내용을 먼저 저장하거나 취소해 주세요" : undefined}
                           onClick={() => {
                             if (confirm("이 인원 행을 삭제할까요?")) onChange((list) => list.filter((_, k) => k !== i));
                           }}
@@ -194,7 +208,7 @@ export function PersonnelEditor({
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={(meta.hasStore ? 5 : 4) + (showDelete ? 1 : 0)}>월별 인원 합계</td>
+              <td colSpan={meta.hasStore ? 5 : 4}>월별 인원 합계</td>
               {totals.map((v, m) => (
                 <td key={m}>{v.toLocaleString("ko-KR")}명</td>
               ))}

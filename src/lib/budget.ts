@@ -1,5 +1,5 @@
 // 금액 계산·표시 — 서버와 브라우저 공용 (원본 HTML 의 money/rowTotal/monthsFor/calculate 이식)
-import type { BudgetAccount, Channel, DepartmentDoc, FeeRow, SalesRow } from "./types";
+import type { BudgetAccount, Channel, DepartmentDoc, FeeRow, RevenuePlan, SalesRow } from "./types";
 
 export const MONTHS = Array.from({ length: 12 }, (_, i) => `${i + 1}월`);
 
@@ -91,11 +91,44 @@ export function calculate(value: string): number {
 // 원본 통합 대시보드 applySalesToRevenueReport 의 매핑 + 채널 라벨 그대로
 const KIND_ALIASES: Record<string, string> = { 셀러퀼: "seller", 공동구매: "group" };
 
-export const kindOf = (channel: Channel) => channel.label.replace(/^\(매출\)\s*/, "");
+const stripKind = (label: string) => label.replace(/^\(매출\)\s*/, "");
+export const kindOf = (channel: Channel) => stripKind(channel.label);
 
 export function channelKeyForKind(kind: string, channels: Channel[]) {
   const k = kind.trim();
-  return channels.find((c) => kindOf(c) === k)?.key ?? KIND_ALIASES[k] ?? null;
+  const alias = KIND_ALIASES[k];
+  return channels.find((c) => kindOf(c) === k)?.key ?? (channels.some((c) => c.key === alias) ? alias : null);
+}
+
+type PlanRowSettings = Pick<RevenuePlan, "year" | "rowLabels" | "rowHidden">;
+
+// 매출 예산안에서 지운 채널은 합산·매출 구분 목록에서도 뺀다
+export const activeChannels = (channels: Channel[], plan: PlanRowSettings) => {
+  const hidden = plan.rowHidden?.[String(plan.year)] ?? [];
+  return channels.filter((c) => !hidden.includes(`ch:${c.key}`));
+};
+
+// 매출 예산안에서 고친 구분명 → 매출 구분 표시 이름. 저장된 매출 구분(kind)은 그대로 두어 합산 연결이 끊기지 않는다
+export function kindNames(channels: Channel[], plan: PlanRowSettings) {
+  const labels = plan.rowLabels?.[String(plan.year)] ?? {};
+  const named = (key: string) => {
+    const label = labels[`ch:${key}`];
+    return label ? stripKind(label) : "";
+  };
+  const names: Record<string, string> = {};
+  for (const c of channels) if (named(c.key)) names[kindOf(c)] = named(c.key);
+  for (const [alias, key] of Object.entries(KIND_ALIASES)) if (named(key)) names[alias] = named(key);
+  return names;
+}
+
+// 정한 순서대로 — 순서에 없는 것은 원래 순서 그대로 뒤에
+export function sortByOrder<T>(items: T[], order: string[] | undefined, idOf: (item: T) => string) {
+  if (!order?.length) return items;
+  const at = new Map(order.map((id, i) => [id, i]));
+  return items
+    .map((item, i) => ({ item, k: at.get(idOf(item)) ?? order.length + i }))
+    .sort((a, b) => a.k - b.k)
+    .map((x) => x.item);
 }
 
 export function channelTotals(departments: Pick<DepartmentDoc, "name" | "salesForecastRows">[], channels: Channel[]) {

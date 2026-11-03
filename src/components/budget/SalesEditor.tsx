@@ -18,6 +18,7 @@ export function SalesEditor({
   deptName,
   rows,
   kinds,
+  kindNames = {},
   editable,
   onChange,
   references = [],
@@ -26,12 +27,14 @@ export function SalesEditor({
   deptName: string;
   rows: SalesRow[];
   kinds: string[];
+  kindNames?: Record<string, string>; // 매출 예산안에서 고친 구분명(표시만)
   editable: boolean;
   onChange: (updater: (rows: SalesRow[]) => SalesRow[]) => void;
   references?: SalesReference[];
   emptyText?: string;
 }) {
   const months = salesMonths(rows);
+  const nameOf = (kind: string) => kindNames[kind] ?? kind;
   const setValue = (i: number, m: number, value: number) =>
     onChange((list) => list.map((x, k) => (k === i ? { ...x, values: x.values.map((y, n) => (n === m ? Math.max(0, value) : y)) } : x)));
 
@@ -64,16 +67,16 @@ export function SalesEditor({
                   <select value={r.kind} aria-label="매출 구분" onChange={(e) => onChange((list) => list.map((x, k) => (k === i ? { ...x, kind: e.target.value } : x)))}>
                     {(kinds.includes(r.kind) ? kinds : [r.kind, ...kinds]).map((k) => (
                       <option key={k} value={k}>
-                        {k}
+                        {nameOf(k)}
                       </option>
                     ))}
                   </select>
                 ) : (
-                  <b>{r.kind}</b>
+                  <b>{nameOf(r.kind)}</b>
                 )}
               </td>
               {r.values.map((v, m) => (
-                <td key={m}>{editable ? <MoneyInput value={v} label={`${r.kind} ${MONTHS[m]} 목표매출`} onCommit={(value) => setValue(i, m, value)} /> : money(v)}</td>
+                <td key={m}>{editable ? <MoneyInput value={v} label={`${nameOf(r.kind)} ${MONTHS[m]} 목표매출`} onCommit={(value) => setValue(i, m, value)} /> : money(v)}</td>
               ))}
               <td>
                 <b>{money(rowTotal(r))}</b>
@@ -84,7 +87,7 @@ export function SalesEditor({
                     type="button"
                     className="danger"
                     onClick={() => {
-                      if (confirm(`‘${r.kind}’ 목표매출 행을 삭제할까요?`)) onChange((list) => list.filter((_, k) => k !== i));
+                      if (confirm(`‘${nameOf(r.kind)}’ 목표매출 행을 삭제할까요?`)) onChange((list) => list.filter((_, k) => k !== i));
                     }}
                   >
                     삭제

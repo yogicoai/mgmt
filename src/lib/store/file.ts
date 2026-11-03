@@ -259,6 +259,12 @@ export const fileStore: BudgetStore = {
     });
   },
 
+  async renameReviewAccount(year, from, to) {
+    await update("reviews", (all) => {
+      for (const doc of Object.values(all)) if (doc.year === year && doc.account === from) doc.account = to;
+    });
+  },
+
   async getVisibility(year) {
     const doc = (await read("settings"))[`${year}:visibility`];
     return doc ? clone(doc) : null;

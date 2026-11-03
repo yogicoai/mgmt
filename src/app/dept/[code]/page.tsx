@@ -5,7 +5,8 @@ import reference from "@/data/reference.json";
 import { homeOf } from "@/lib/auth/accounts";
 import { currentAccount } from "@/lib/auth/guard";
 import { MASTER_ID } from "@/lib/auth/local";
-import { kindOf } from "@/lib/budget";
+import { activeChannels, kindNames, kindOf } from "@/lib/budget";
+import { getRevenuePlan } from "@/lib/departments";
 import { BUDGET_YEAR, channels, findDeptMeta } from "@/lib/templates";
 
 type Props = { params: Promise<{ code: string }> };
@@ -25,13 +26,15 @@ export default async function DepartmentPage({ params }: Props) {
   const account = await currentAccount();
   if (!account) redirect(`/login?next=${encodeURIComponent(`/dept/${code}`)}`);
   if (account.role !== "admin" && account.deptCode !== code) redirect(homeOf(account));
+  const plan = await getRevenuePlan(BUDGET_YEAR); // 매출 구분 목록·표시 이름은 매출 예산안에서 고친 대로
   return (
     <DeptDashboard
       meta={meta}
       reference={reference}
       year={BUDGET_YEAR}
       prevYear={BUDGET_YEAR - 1}
-      salesKinds={channels.map(kindOf)}
+      salesKinds={activeChannels(channels, plan).map(kindOf)}
+      salesKindNames={kindNames(channels, plan)}
       viewer={{ loginId: account.loginId, deptName: account.deptName, isAdmin: account.role === "admin", master: account._id === MASTER_ID }}
     />
   );

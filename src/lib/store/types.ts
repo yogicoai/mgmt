@@ -11,6 +11,9 @@ export interface PlanPatch {
   fees?: FeeRow[];
   cogs?: FeeRow[];
   rowOrder?: Record<string, string[]>;
+  rowLabels?: Record<string, Record<string, string>>;
+  rowHidden?: Record<string, string[]>;
+  deptOrder?: string[];
 }
 
 export interface PatchOptions {
@@ -59,6 +62,8 @@ export interface BudgetStore {
   updateReview(id: string, patch: Partial<Pick<ReviewComment, "status" | "resolvedAt" | "text">>): Promise<ReviewComment | null>;
   addReviewReply(id: string, reply: ReviewReply): Promise<ReviewComment | null>;
   deleteReview(id: string): Promise<boolean>;
+  /** 계정과목 이름을 고칠 때 그 계정에 남은 검토 의견도 따라간다 */
+  renameReviewAccount(year: number, from: string, to: string): Promise<void>;
 
   // 계정과목 노출 설정 — expectedRevision 이 다르면 ok:false(다른 화면이 먼저 저장)
   getVisibility(year: number): Promise<AccountVisibility | null>;

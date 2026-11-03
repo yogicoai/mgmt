@@ -23,6 +23,7 @@ export function Guideline({
   deptName,
   salesRows,
   salesKinds,
+  salesKindNames,
   salesEditable,
   onSalesChange,
   actuals,
@@ -31,6 +32,7 @@ export function Guideline({
   deptName: string;
   salesRows: SalesRow[];
   salesKinds: string[];
+  salesKindNames: Record<string, string>;
   salesEditable: boolean; // 마케팅·영업·온라인고객지원 + 경영지원
   onSalesChange: (updater: (rows: SalesRow[]) => SalesRow[]) => void;
   actuals: ActualsResult | null;
@@ -74,6 +76,7 @@ export function Guideline({
         deptName={deptName}
         rows={salesRows}
         kinds={salesKinds}
+        kindNames={salesKindNames}
         editable={salesEditable && editing}
         onChange={onSalesChange}
         references={references}

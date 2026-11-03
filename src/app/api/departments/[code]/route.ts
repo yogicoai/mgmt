@@ -36,6 +36,8 @@ export const PATCH = handle(async (request: Request, { params }: Context) => {
   const expected: Partial<Record<Section, number>> = {};
   const patch: DeptPatch = {};
   if (body.accounts) {
+    // 경영지원이 계정과목을 추가·수정·삭제한 뒤의 옛 화면 — 아래 구성 규칙에 걸리기 전에 충돌로 돌려보내 새 구성을 받게 한다
+    if (body.accounts.revision !== current.revisions.accounts) return fail("다른 화면에서 먼저 저장한 내용이 있습니다.", 409, { department: user.role === "admin" ? current : maskForTeam(current) });
     expected.accounts = body.accounts.revision;
     patch.accounts = body.accounts.data;
     // 팀 계정: 계정과목 구성은 그대로, '경영지원 입력' 줄(급여·4대보험·회사 행사 등)은 손대지 못한다
@@ -66,7 +68,8 @@ export const PATCH = handle(async (request: Request, { params }: Context) => {
       const before = current.accounts.find((c) => c.name === a.name);
       const changed = !before || JSON.stringify(rest.rows) !== JSON.stringify(before.rows);
       const lastEdit = changed && !invisible ? stamp : before?.lastEdit;
-      return lastEdit ? { ...rest, lastEdit } : rest;
+      const kept = before?.origin ? { ...rest, origin: before.origin } : rest; // 원래 이름은 서버가 간직한다(2026 실적 찾는 키)
+      return lastEdit ? { ...kept, lastEdit } : kept;
     });
   }
   if (body.personnel) {

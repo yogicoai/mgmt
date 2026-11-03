@@ -79,24 +79,25 @@ export function BudgetOverview({ year, departments, onSelect, onImported }: { ye
             <colgroup>
               <col style={{ width: "8.5%" }} />
               <col style={{ width: "8.5%" }} />
-              <col style={{ width: "8.5%" }} />
               {MONTHS.map((m) => (
                 <col key={m} />
               ))}
+              <col style={{ width: "8.5%" }} />
             </colgroup>
             <thead>
               <tr>
                 <th>부서</th>
                 <th>상태 · 검토 의견</th>
-                <th>연간 합계</th>
                 {MONTHS.map((m) => (
                   <th key={m}>{m}</th>
                 ))}
+                <th>연간 합계</th>
               </tr>
             </thead>
             <tbody>
               {perDept.map(({ doc, months: m }) => {
                 const status = departmentStatus(doc);
+                const counts = reviewCounts[doc.code];
                 return (
                   <tr key={doc.code}>
                     <td>
@@ -104,20 +105,24 @@ export function BudgetOverview({ year, departments, onSelect, onImported }: { ye
                         {doc.name}
                       </button>
                     </td>
+                    {/* 칸마다 배지 하나 — 반영할 검토 의견이 있으면 그것을, 없으면 상태를(나머지는 마우스를 올리면) */}
                     <td className="status-cell">
-                      <span className={`badge${status === "마감 완료" ? " closed" : status === "저장 완료" ? " saved" : ""}`}>{status}</span>
-                      {reviewCounts[doc.code]?.total ? (
-                        <button type="button" className="link" onClick={() => onSelect(doc.code)} title={`검토 의견 전체 ${reviewCounts[doc.code].total}건`}>
-                          {reviewCounts[doc.code].open ? <span className="badge warn">반영 필요 {reviewCounts[doc.code].open}</span> : <span className="badge saved">모두 반영</span>}
+                      {counts?.open ? (
+                        <button type="button" className="link" onClick={() => onSelect(doc.code)} title={`${status} · 검토 의견 전체 ${counts.total}건`}>
+                          <span className="badge warn">반영 필요 {counts.open}</span>
                         </button>
-                      ) : null}
-                    </td>
-                    <td>
-                      <b>{money(sum(m))}</b>
+                      ) : (
+                        <span className={`badge${status === "마감 완료" ? " closed" : status === "저장 완료" ? " saved" : ""}`} title={counts?.total ? `검토 의견 ${counts.total}건 모두 반영` : undefined}>
+                          {status}
+                        </span>
+                      )}
                     </td>
                     {m.map((v, i) => (
                       <td key={i}>{money(v)}</td>
                     ))}
+                    <td>
+                      <b>{money(sum(m))}</b>
+                    </td>
                   </tr>
                 );
               })}
@@ -125,10 +130,10 @@ export function BudgetOverview({ year, departments, onSelect, onImported }: { ye
             <tfoot>
               <tr>
                 <td colSpan={2}>전체 합계</td>
-                <td>{money(total)}</td>
                 {months.map((v, i) => (
                   <td key={i}>{money(v)}</td>
                 ))}
+                <td>{money(total)}</td>
               </tr>
             </tfoot>
           </table>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { activeChannels } from "@/lib/budget";
 import { api, formatTime } from "@/lib/client";
 import type { Channel, DepartmentDoc, DeptMeta, PnlPrior, Revenue2026Row, RevenuePlan, StorageKind, SyncInfo } from "@/lib/types";
 import { UserMenu, useUi, type Viewer } from "../ui";
@@ -243,7 +244,7 @@ export function UnifiedDashboard({
                 prevYear={prevYear}
                 metas={metas}
                 departments={departments}
-                channels={channels}
+                channels={activeChannels(channels, plan)}
                 revenue2026={revenue2026}
                 plan={plan}
                 onPlanSaved={setPlan}
@@ -252,7 +253,7 @@ export function UnifiedDashboard({
             )}
             {tab === "budget" && <BudgetOverview year={year} departments={departments} onSelect={(code) => choose(`dept-${code}`)} onImported={() => void load()} />}
             {tab === "pnl" && (
-              <PnlOverview year={year} prevYear={prevYear} departments={departments} channels={channels} plan={plan} pnlPrior={pnlPrior} onPlanSaved={setPlan} viewer={viewer} />
+              <PnlOverview year={year} prevYear={prevYear} departments={departments} channels={activeChannels(channels, plan)} plan={plan} pnlPrior={pnlPrior} onPlanSaved={setPlan} viewer={viewer} />
             )}
             {tab === "personnel" && <PersonnelOverview year={year} departments={departments} />}
             {deptMeta && <DeptLedgerTab key={deptMeta.code} meta={deptMeta} year={year} onSaved={onDeptSaved} viewer={viewer} />}
@@ -266,7 +267,7 @@ export function UnifiedDashboard({
                 ))}
               </div>
             )}
-            {tab === "visibility" && <AccountVisibilityPanel metas={metas} departments={departments} />}
+            {tab === "visibility" && <AccountVisibilityPanel metas={metas} departments={departments} onChanged={load} />}
             {tab === "accounts" && <AccountsPanel year={year} />}
           </>
         )}

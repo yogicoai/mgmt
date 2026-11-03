@@ -23,6 +23,7 @@ export interface BudgetAccount {
   rows: BudgetRow[];
   masked?: boolean; // 팀 화면용 — 경영지원 전용 계정이라 금액을 보내지 않음
   lastEdit?: AccountEdit;
+  origin?: string; // 이름을 고친 계정의 원래 이름 — 2026 실적(원본 자료)을 이 이름으로 찾는다
 }
 
 export interface PersonRow {
@@ -143,6 +144,9 @@ export interface RevenuePlan {
   fees: FeeRow[];
   cogs: FeeRow[]; // 매출원가(제품·상품) — 경영지원 입력, 손익 탭에서 사용
   rowOrder?: Record<string, string[]>; // 매출 예산안 줄 순서(연도별) — 경영지원이 꾹 눌러 끌어서 바꾼 것
+  rowLabels?: Record<string, Record<string, string>>; // 매출 예산안 구분명(연도별, 줄 id → 고친 이름). 채널은 저장된 매출 구분을 그대로 두고 표시만 바뀐다
+  rowHidden?: Record<string, string[]>; // 매출 예산안에서 삭제한 줄(연도별 줄 id) — 복원 가능
+  deptOrder?: string[]; // 부서별 월별 목표매출의 부서 순서(부서코드)
   revision: number;
   updatedAt: string | null;
 }

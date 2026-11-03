@@ -110,6 +110,131 @@ export function Modal({ className, title, onClose, children, footer }: { classNa
   );
 }
 
+// 이름 하나 입력 창 — 매출 예산안 구분명·계정과목. 저장에 실패하면 onSave 쪽에서 알리고 창은 그대로 둔다
+export function NameDialog({
+  title,
+  label,
+  initial = "",
+  hint,
+  maxLength,
+  onSave,
+  onClose,
+}: {
+  title: string;
+  label: string;
+  initial?: string;
+  hint?: string;
+  maxLength: number;
+  onSave: (name: string) => Promise<unknown>;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const value = name.trim();
+  const save = async () => {
+    if (!value || busy) return;
+    setBusy(true);
+    try {
+      await onSave(value);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal
+      className="memo-dialog"
+      title={title}
+      onClose={onClose}
+      footer={
+        <>
+          <span className="muted">{hint}</span>
+          <button type="button" className="primary" disabled={!value || busy} onClick={() => void save()}>
+            저장
+          </button>
+        </>
+      }
+    >
+      <div className="modal-body form-grid">
+        <label>
+          {label}
+          <input
+            value={name}
+            maxLength={maxLength}
+            autoFocus
+            spellCheck={false}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) void save(); // 한글 조합 중 Enter 는 조합만 끝낸다
+            }}
+          />
+        </label>
+      </div>
+    </Modal>
+  );
+}
+
+// 줄 순서를 바꾼 뒤 저장 전 안내 — 끌어서 바꾼 순서는 [변경내용 저장]을 눌러야 저장된다. 저장 안 하고 창을 닫으면 경고
+export function OrderSaveBar({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) {
+  useEffect(() => {
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, []);
+  return (
+    <span className="order-save" role="status">
+      <span className="chip busy">순서 변경됨 — 저장해야 반영</span>
+      <button type="button" className="primary" onClick={onSave}>
+        변경내용 저장
+      </button>
+      <button type="button" onClick={onCancel}>
+        취소
+      </button>
+    </span>
+  );
+}
+
+// 예/아니오 확인 창 — 처리가 끝날 때까지 열어 두고, 닫는 것은 부르는 쪽에서(onConfirm 끝난 뒤)
+export function ConfirmDialog({ title, message, danger = true, onConfirm, onClose }: { title: string; message: string; danger?: boolean; onConfirm: () => Promise<unknown>; onClose: () => void }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <Modal
+      className="memo-dialog"
+      title={title}
+      onClose={onClose}
+      footer={
+        <div className="actions" style={{ marginLeft: "auto" }}>
+          <button type="button" disabled={busy} onClick={onClose}>
+            아니오
+          </button>
+          <button
+            type="button"
+            className={danger ? "danger-solid" : "primary"}
+            disabled={busy}
+            autoFocus
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await onConfirm();
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {busy ? "처리 중…" : "예"}
+          </button>
+        </div>
+      }
+    >
+      <div className="modal-body">
+        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.7 }}>{message}</p>
+      </div>
+    </Modal>
+  );
+}
+
 export interface Viewer {
   loginId: string;
   deptName: string;

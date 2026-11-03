@@ -31,7 +31,7 @@ export function PersonnelOverview({ year, departments: all }: { year: number; de
       <div className="section-title">
         <div>
           <h2>{year}년 인원현황</h2>
-          <span className="muted">인원 구성은 경영지원이 각 팀 화면 ‘{year}년 인원정보’에서 입력(영업 매장 직원은 영업 계정도 입력 가능)</span>
+          <span className="muted">부서명을 누르면 그 팀 화면 ‘{year}년 인원정보’에서 수정(영업 매장 직원은 영업 계정도 입력 가능)</span>
         </div>
         <div className="actions">
           <select value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="인원현황 부서 선택">
@@ -73,12 +73,10 @@ export function PersonnelOverview({ year, departments: all }: { year: number; de
             <tbody>
               {shown.flatMap((d) => [
                 <tr key={d.code} className="dept">
-                  <td>
-                    {d.name} ({d.code})
-                  </td>
-                  <td>
-                    <a href={`/dept/${d.code}#personnel`} target="_blank" rel="noreferrer" title={`${d.name} 인원정보 입력 화면`}>
-                      인원 입력 ↗
+                  {/* 부서명을 누르면 그 부서 인원정보 입력 화면 */}
+                  <td colSpan={2}>
+                    <a href={`/dept/${d.code}#personnel`} target="_blank" rel="noreferrer" title={`${d.name} 인원정보 수정 화면 열기`}>
+                      {d.name} ({d.code}) ↗
                     </a>
                   </td>
                   {personnelMonths(d.personnel).map((v, m) => (

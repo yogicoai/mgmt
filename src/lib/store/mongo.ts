@@ -223,6 +223,10 @@ export const mongoStore: BudgetStore = {
     return (await (await reviews()).deleteOne({ _id: id })).deletedCount === 1;
   },
 
+  async renameReviewAccount(year, from, to) {
+    await (await reviews()).updateMany({ year, account: from }, { $set: { account: to } });
+  },
+
   async getVisibility(year) {
     return (await settings()).findOne({ _id: `${year}:visibility` });
   },
