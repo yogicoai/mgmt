@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useDepartment } from "@/hooks/useDepartment";
 import { useLongPressDrag, type RowDrag } from "@/hooks/useLongPressDrag";
-import { MONTHS, money, rowTotal, salesMonths, sortByOrder, sum } from "@/lib/budget";
+import { MONTHS, money, rowTotal, salesDeptName, salesMonths, sortByOrder, sum } from "@/lib/budget";
 import type { DepartmentDoc, DeptMeta, SalesRow } from "@/lib/types";
 import { MoneyInput } from "../budget/MoneyInput";
 import { OrderSaveBar, useUi } from "../ui";
@@ -179,11 +179,12 @@ function DeptSalesGroup({
     return () => void rowSavers.delete(meta.code);
   }, [rowSavers, meta.code, update]);
   const groupClass = `dept-group${drag?.group === "depts" && drag.id === meta.code ? " dragging" : ""}`;
+  const deptName = salesDeptName(meta); // 이 표에 보이는 부서 이름 — 불러오고 저장하는 부서는 meta.code 그대로
   if (!doc)
     return (
       <tbody className={groupClass} data-drag-id={meta.code}>
         <tr>
-          <td className="dept-cell">{meta.name}</td>
+          <td className="dept-cell">{deptName}</td>
           <td colSpan={15} className="muted">
             {state.loadError ?? "불러오는 중…"}
           </td>
@@ -204,7 +205,7 @@ function DeptSalesGroup({
   };
   const deptCell = (
     <td className={`dept-cell${deptPress ? " draggable" : ""}`} rowSpan={rows.length + 1} title={deptPress ? DRAG_HINT : undefined} {...deptPress}>
-      <b>{meta.name}</b>
+      <b>{deptName}</b>
     </td>
   );
 
@@ -218,7 +219,7 @@ function DeptSalesGroup({
             {at === 0 && deptCell}
             <td className={`kind${canDrag ? " draggable" : ""}`} title={canDrag ? DRAG_HINT : undefined} {...rowPress}>
               {editing ? (
-                <select value={r.kind} aria-label={`${meta.name} 매출 구분`} onChange={(e) => setRows((list) => list.map((x, k) => (k === i ? { ...x, kind: e.target.value } : x)))}>
+                <select value={r.kind} aria-label={`${deptName} 매출 구분`} onChange={(e) => setRows((list) => list.map((x, k) => (k === i ? { ...x, kind: e.target.value } : x)))}>
                   {(kinds.includes(r.kind) ? kinds : [r.kind, ...kinds]).map((k) => (
                     <option key={k} value={k}>
                       {nameOf(k)}
@@ -234,7 +235,7 @@ function DeptSalesGroup({
                 {editing ? (
                   <MoneyInput
                     value={v}
-                    label={`${meta.name} ${nameOf(r.kind)} ${MONTHS[m]} 목표매출`}
+                    label={`${deptName} ${nameOf(r.kind)} ${MONTHS[m]} 목표매출`}
                     onCommit={(value) => setRows((list) => list.map((x, k) => (k === i ? { ...x, values: x.values.map((y, n) => (n === m ? Math.max(0, value) : y)) } : x)))}
                   />
                 ) : (
@@ -253,7 +254,7 @@ function DeptSalesGroup({
                   disabled={Boolean(rowOrder)}
                   title={rowOrder ? "변경 내용을 먼저 저장하거나 취소해 주세요" : undefined}
                   onClick={() => {
-                    if (confirm(`${meta.name} ‘${nameOf(r.kind)}’ 목표매출 행을 삭제할까요?`)) setRows((list) => list.filter((_, k) => k !== i));
+                    if (confirm(`${deptName} ‘${nameOf(r.kind)}’ 목표매출 행을 삭제할까요?`)) setRows((list) => list.filter((_, k) => k !== i));
                   }}
                 >
                   삭제
@@ -265,7 +266,7 @@ function DeptSalesGroup({
       })}
       <tr className="subtotal">
         {rows.length === 0 && deptCell}
-        <td className="kind">{rows.length ? `${meta.name} 소계` : "목표매출 없음"}</td>
+        <td className="kind">{rows.length ? `${deptName} 소계` : "목표매출 없음"}</td>
         {months.map((v, m) => (
           <td key={m}>{money(v)}</td>
         ))}

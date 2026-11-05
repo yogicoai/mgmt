@@ -29,6 +29,14 @@ export const personnelMonths = (rows: { values: number[] }[]) =>
 // 경영지원 전용 계정 — 전 줄이 '경영지원 입력'(직원급여·퇴직급여·세금과공과금 등). 팀에는 금액을 보내지 않고, 경영지원도 비밀번호를 한 번 더 넣어야 보임
 export const isSensitiveAccount = (account: BudgetAccount) => account.rows.length > 0 && account.rows.every((r) => r.locked);
 
+// 목표매출 화면에서만 다른 이름으로 보이는 부서 — 부서코드는 그대로라 데이터 연결은 바뀌지 않는다(임원 0001 = 사업개발)
+const SALES_DEPT_NAMES: Record<string, string> = { "0001": "사업개발" };
+export const salesDeptName = (dept: { code: string; name: string }) => SALES_DEPT_NAMES[dept.code] ?? dept.name;
+
+// 통합 합산에서 빼는 부서 — 금액은 통합 화면의 그 부서 탭에서만 본다(물류)
+const BUDGET_EXCLUDED_DEPTS = new Set(["0020"]);
+export const inBudgetTotal = (code: string) => !BUDGET_EXCLUDED_DEPTS.has(code);
+
 export const filledAccountCount = (accounts: BudgetAccount[]) =>
   accounts.filter((a) => a.rows.some((r) => r.values.some((v) => v !== 0))).length;
 

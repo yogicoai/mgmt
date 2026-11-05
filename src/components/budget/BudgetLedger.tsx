@@ -84,7 +84,7 @@ export function BudgetLedger({
   const monthNotes = (account: BudgetAccount, m: number) =>
     account.rows
       .filter((r) => r.memos?.[m]?.trim())
-      .map((r) => `${[r.item, r.desc].filter(Boolean).join(" · ")}\n${r.memos![m]}`)
+      .map((r) => [r.item, r.memos![m]].filter(Boolean).join("\n"))
       .join("\n\n");
 
   // 엑셀 — account 를 주면 그 계정 상세, 없으면 부서 전체(계정별 요약 + 상세 내역)

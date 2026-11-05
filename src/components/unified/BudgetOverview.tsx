@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MONTHS, accountsMonths, departmentStatus, money, sum } from "@/lib/budget";
+import { MONTHS, accountsMonths, departmentStatus, inBudgetTotal, money, sum } from "@/lib/budget";
 import { api, downloadCsv } from "@/lib/client";
 import type { DepartmentDoc } from "@/lib/types";
 import { BarChart, RankBars } from "../charts";
@@ -16,7 +16,10 @@ export function BudgetOverview({ year, departments, onSelect, onImported }: { ye
       .then((r) => setReviewCounts(r.counts))
       .catch(() => undefined);
   }, [departments]);
-  const perDept = departments.map((d) => ({ doc: d, months: accountsMonths(d.accounts) }));
+  // 물류는 합산에서 뺀다 — 표에는 상태만 남기고 금액은 물류 탭에서만
+  const included = departments.filter((d) => inBudgetTotal(d.code));
+  const excluded = departments.filter((d) => !inBudgetTotal(d.code));
+  const perDept = included.map((d) => ({ doc: d, months: accountsMonths(d.accounts) }));
   const months = MONTHS.map((_, m) => perDept.reduce((t, d) => t + d.months[m], 0));
   const total = sum(months);
   const saved = departments.filter((d) => d.savedAt || d.closed).length;
@@ -26,8 +29,27 @@ export function BudgetOverview({ year, departments, onSelect, onImported }: { ye
   const exportCsv = () =>
     downloadCsv(`${year}_예산원장_통합.csv`, [
       ["연도", "부서", "계정과목", "구분", "상세설명", "연간 합계", ...MONTHS],
-      ...departments.flatMap((d) => d.accounts.flatMap((a) => a.rows.map((r) => [year, d.name, a.name, r.item, r.desc, sum(r.values), ...r.values]))),
+      ...included.flatMap((d) => d.accounts.flatMap((a) => a.rows.map((r) => [year, d.name, a.name, r.item, r.desc, sum(r.values), ...r.values]))),
     ]);
+  const excludedNames = excluded.map((d) => d.name).join("·");
+  const statusCell = (doc: DepartmentDoc) => {
+    const status = departmentStatus(doc);
+    const counts = reviewCounts[doc.code];
+    // 칸마다 배지 하나 — 반영할 검토 의견이 있으면 그것을, 없으면 상태를(나머지는 마우스를 올리면)
+    return (
+      <td className="status-cell">
+        {counts?.open ? (
+          <button type="button" className="link" onClick={() => onSelect(doc.code)} title={`${status} · 검토 의견 전체 ${counts.total}건`}>
+            <span className="badge warn">반영 필요 {counts.open}</span>
+          </button>
+        ) : (
+          <span className={`badge${status === "마감 완료" ? " closed" : status === "저장 완료" ? " saved" : ""}`} title={counts?.total ? `검토 의견 ${counts.total}건 모두 반영` : undefined}>
+            {status}
+          </span>
+        )}
+      </td>
+    );
+  };
 
   return (
     <>
@@ -35,7 +57,7 @@ export function BudgetOverview({ year, departments, onSelect, onImported }: { ye
         <div>
           <h2>전체 예산 현황</h2>
           <span className="muted">
-            {year}년 · {departments.length}개 부서 통합 · 부서 화면에서 저장한 값이 바로 합산됩니다
+            {year}년 · {included.length}개 부서 통합 · 부서 화면에서 저장한 값이 바로 합산됩니다{excludedNames ? ` · ${excludedNames}는 합산 제외(${excludedNames} 탭에서 확인)` : ""}
           </span>
         </div>
         <div className="actions">
@@ -48,7 +70,7 @@ export function BudgetOverview({ year, departments, onSelect, onImported }: { ye
         </div>
       </div>
       <div className="cards">
-        <StatCard label="전체 연간 예산" value={money(total)} note={`${departments.length}개 부서 계정별 예산 합계`} />
+        <StatCard label="전체 연간 예산" value={money(total)} note={`${included.length}개 부서 계정별 예산 합계${excludedNames ? ` · ${excludedNames} 제외` : ""}`} />
         <StatCard label="월평균 예산" value={money(total / 12)} note="연간 예산 ÷ 12개월" />
         <StatCard label="자료 저장 부서" value={`${saved} / ${departments.length}`} unit="개" note={`마감 ${closed}개 부서`} />
         <StatCard label="예산 계정" value={accountNames.size} unit="개" note="전체 부서 계정 기준" />
@@ -95,37 +117,35 @@ export function BudgetOverview({ year, departments, onSelect, onImported }: { ye
               </tr>
             </thead>
             <tbody>
-              {perDept.map(({ doc, months: m }) => {
-                const status = departmentStatus(doc);
-                const counts = reviewCounts[doc.code];
-                return (
-                  <tr key={doc.code}>
-                    <td>
-                      <button type="button" className="account-button" onClick={() => onSelect(doc.code)}>
-                        {doc.name}
-                      </button>
-                    </td>
-                    {/* 칸마다 배지 하나 — 반영할 검토 의견이 있으면 그것을, 없으면 상태를(나머지는 마우스를 올리면) */}
-                    <td className="status-cell">
-                      {counts?.open ? (
-                        <button type="button" className="link" onClick={() => onSelect(doc.code)} title={`${status} · 검토 의견 전체 ${counts.total}건`}>
-                          <span className="badge warn">반영 필요 {counts.open}</span>
-                        </button>
-                      ) : (
-                        <span className={`badge${status === "마감 완료" ? " closed" : status === "저장 완료" ? " saved" : ""}`} title={counts?.total ? `검토 의견 ${counts.total}건 모두 반영` : undefined}>
-                          {status}
-                        </span>
-                      )}
-                    </td>
-                    {m.map((v, i) => (
-                      <td key={i}>{money(v)}</td>
-                    ))}
-                    <td>
-                      <b>{money(sum(m))}</b>
-                    </td>
-                  </tr>
-                );
-              })}
+              {perDept.map(({ doc, months: m }) => (
+                <tr key={doc.code}>
+                  <td>
+                    <button type="button" className="account-button" onClick={() => onSelect(doc.code)}>
+                      {doc.name}
+                    </button>
+                  </td>
+                  {statusCell(doc)}
+                  {m.map((v, i) => (
+                    <td key={i}>{money(v)}</td>
+                  ))}
+                  <td>
+                    <b>{money(sum(m))}</b>
+                  </td>
+                </tr>
+              ))}
+              {excluded.map((doc) => (
+                <tr key={doc.code}>
+                  <td>
+                    <button type="button" className="account-button" onClick={() => onSelect(doc.code)}>
+                      {doc.name}
+                    </button>
+                  </td>
+                  {statusCell(doc)}
+                  <td colSpan={13} className="excluded-note">
+                    합산 제외 — 금액은 {doc.name} 탭에서 확인
+                  </td>
+                </tr>
+              ))}
             </tbody>
             <tfoot>
               <tr>

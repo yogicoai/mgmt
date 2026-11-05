@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { accountMonths, money, sum } from "@/lib/budget";
+import { accountMonths, inBudgetTotal, money, sum } from "@/lib/budget";
 import { api, type ApiError } from "@/lib/client";
 import type { DepartmentDoc, DeptMeta, SyncInfo } from "@/lib/types";
 import { SYNC_EVENT } from "../Presence";
@@ -159,11 +159,11 @@ export function AccountVisibilityPanel({ metas, departments, onChanged }: { meta
                       const locked = !hidden && amount !== 0; // 금액이 있으면 숨길 수 없음
                       return (
                         <td key={m.code} className={hidden ? "off" : undefined}>
-                          <label title={locked ? `금액 ${money(amount)}원이 있어 숨길 수 없습니다` : hidden ? `${m.name}에 숨김 — 누르면 보이기` : `${m.name}에 보임 — 누르면 숨기기`}>
+                          <label title={locked ? (inBudgetTotal(m.code) ? `금액 ${money(amount)}원이 있어 숨길 수 없습니다` : "금액이 있어 숨길 수 없습니다") : hidden ? `${m.name}에 숨김 — 누르면 보이기` : `${m.name}에 보임 — 누르면 숨기기`}>
                             <input type="checkbox" checked={!hidden} disabled={locked || saving} onChange={() => toggle(name, m.code)} />
                             <span>{hidden ? "숨김" : "보임"}</span>
                           </label>
-                          {amount !== 0 && <small>{money(amount)}</small>}
+                          {amount !== 0 && inBudgetTotal(m.code) && <small>{money(amount)}</small>}
                         </td>
                       );
                     })}

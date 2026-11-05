@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useDepartment } from "@/hooks/useDepartment";
 import { useLongPressDrag } from "@/hooks/useLongPressDrag";
-import { MONTHS, channelTotals, kindNames, kindOf, money, revenueMetrics, rowTotal, salesMonths, sortByOrder, sum, zeros } from "@/lib/budget";
+import { MONTHS, channelTotals, kindNames, kindOf, money, revenueMetrics, rowTotal, salesDeptName, salesMonths, sortByOrder, sum, zeros } from "@/lib/budget";
 import { api, downloadCsv, type ApiError } from "@/lib/client";
 import type { Channel, DepartmentDoc, DeptMeta, Revenue2026Row, RevenuePlan, SalesRow } from "@/lib/types";
 import { DeptBanners } from "../budget/DeptBanners";
@@ -63,10 +63,12 @@ export function RevenueOverview({
   const { drag, press, suppressClick } = useLongPressDrag();
   const [pending, setPending] = useState<Record<string, string[]>>({}); // 끌어서 바꾼 순서 — [변경내용 저장]을 눌러야 저장
   const tableRef = useRef<HTMLTableElement>(null);
-  const { values, sources, unmatched } = useMemo(() => channelTotals(departments, channels), [departments, channels]);
+  // 이 화면(목표매출)에 보이는 부서 이름은 salesDeptName — 임원은 사업개발로 보이고 불러오고 저장하는 부서코드는 그대로
+  const { values, sources, unmatched } = useMemo(() => channelTotals(departments.map((d) => ({ ...d, name: salesDeptName(d) })), channels), [departments, channels]);
   const names = useMemo(() => kindNames(channels, plan), [channels, plan]);
   const metrics = revenueMetrics(values, plan.fees);
-  const selected = metas.find((m) => m.code === dept);
+  const picked = metas.find((m) => m.code === dept);
+  const selected = picked && { ...picked, name: salesDeptName(picked) };
 
   const y26 = String(prevYear);
   const y27 = String(year);
@@ -131,8 +133,9 @@ export function RevenueOverview({
   };
 
   const saveName = async (yearKey: string, row: NamedRow, name: string) => {
-    // 채널끼리 이름이 같으면 매출 구분 목록에서 구별이 안 된다
-    if (yearKey === y27 && row.type === "channel" && rows2027.some((r) => r.type === "channel" && r.id !== row.id && r.label === name)) return notify(`‘${name}’ 구분이 이미 있습니다.`, true);
+    // 채널끼리 이름이 같으면 매출 구분 목록에서 구별이 안 된다 — ‘(매출)’ 만 다른 이름도 목록에서는 같은 이름
+    const kindName = (label: string) => kindOf({ key: "", label });
+    if (yearKey === y27 && row.type === "channel" && rows2027.some((r) => r.type === "channel" && r.id !== row.id && kindName(r.label) === kindName(name))) return notify(`‘${name}’ 구분이 이미 있습니다.`, true);
     const labels = { ...(plan.rowLabels?.[yearKey] ?? {}) };
     if (name === row.base) delete labels[row.id];
     else labels[row.id] = name;
@@ -193,7 +196,7 @@ export function RevenueOverview({
             <option value="all">전체</option>
             {metas.map((m) => (
               <option key={m.code} value={m.code}>
-                {m.name}
+                {salesDeptName(m)}
               </option>
             ))}
           </select>

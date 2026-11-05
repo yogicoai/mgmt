@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MONTHS, channelTotals, isSensitiveAccount, money, percent, revenueMetrics, sum } from "@/lib/budget";
+import { MONTHS, channelTotals, inBudgetTotal, isSensitiveAccount, money, percent, revenueMetrics, sum } from "@/lib/budget";
 import { downloadCsv } from "@/lib/client";
 import type { Channel, DepartmentDoc, PnlPrior, RevenuePlan } from "@/lib/types";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -20,7 +20,7 @@ interface PnlRow {
 const ratio = (part: number, whole: number) => (whole ? `${((part / whole) * 100).toFixed(1)}%` : "—");
 
 // 손익 기준 예산안 — 원본 HTML 에서 숨겨져 있던 '손익 기준 / 영업손익 취합본'을 되살린 것.
-//   매출액(손익계산서 = ERP 목표 − 수수료) − 매출원가(경영지원 입력) = 매출총이익 − 판관비(전 부서 30개 계정) = 영업손익
+//   매출액(손익계산서 = ERP 목표 − 수수료) − 매출원가(경영지원 입력) = 매출총이익 − 판관비(물류를 뺀 전 부서 계정 — 물류 금액은 물류 탭에서만) = 영업손익
 export function PnlOverview({
   year,
   prevYear,
@@ -58,7 +58,7 @@ export function PnlOverview({
     const accountList = departments[0]?.accounts ?? [];
     const accountNames = accountList.map((a) => a.name);
     const accountMonths = accountNames.map((name) =>
-      MONTHS.map((_, m) => departments.reduce((t, d) => t + (d.accounts.find((a) => a.name === name)?.rows.reduce((s, r) => s + (r.values[m] || 0), 0) ?? 0), 0)),
+      MONTHS.map((_, m) => departments.filter((d) => inBudgetTotal(d.code)).reduce((t, d) => t + (d.accounts.find((a) => a.name === name)?.rows.reduce((s, r) => s + (r.values[m] || 0), 0) ?? 0), 0)),
     );
     const sga = MONTHS.map((_, m) => accountMonths.reduce((t, a) => t + a[m], 0));
     const operating = gross.map((v, m) => v - sga[m]);
@@ -98,7 +98,7 @@ export function PnlOverview({
       <div className="section-title">
         <div>
           <h2>{year} 손익 기준 예산안</h2>
-          <span className="muted">매출액(손익계산서) − 매출원가 = 매출총이익 − 판매비와관리비(전 부서 합산) = 영업손익</span>
+          <span className="muted">매출액(손익계산서) − 매출원가 = 매출총이익 − 판매비와관리비(물류 제외 전 부서 합산) = 영업손익</span>
         </div>
         <div className="actions">
           {!sensitive.visible && sensitive.canUnlock && (

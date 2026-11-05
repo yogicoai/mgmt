@@ -245,7 +245,7 @@ export async function departmentWorkbook({ year, deptName, deptCode, accounts }:
       if (m < 12) {
         const notes = account.rows
           .filter((x) => x.memos?.[m]?.trim())
-          .map((x) => `${[x.item, x.desc].filter(Boolean).join(" · ")}\n${x.memos![m]}`)
+          .map((x) => [x.item, x.memos![m]].filter(Boolean).join("\n"))
           .join("\n\n");
         if (notes) cell.note = { texts: [{ text: notes, font: { name: "Pretendard", size: 10 } }] };
       }

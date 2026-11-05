@@ -444,6 +444,7 @@ table.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbi
 .fit-table .money-input { font-size: var(--num-font); padding-left: 2px; padding-right: 2px; letter-spacing: -0.2px; }
 .overview-table th { text-align: center; }
 .overview-table .status-cell { text-align: center; }
+.overview-table td.excluded-note { text-align: center; color: var(--muted); font-size: 12px; }
 
 @media (max-width: 1200px) {
   .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
