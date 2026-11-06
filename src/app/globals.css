@@ -149,6 +149,11 @@ main.page { max-width: 1840px; margin: 0 auto; padding: 24px 28px 60px; }
 .card .value { font-size: 26px; font-weight: 900; letter-spacing: -0.5px; margin: 10px 0 6px; word-break: break-all; }
 .card .unit { font-size: 13px; font-weight: 600; margin-left: 4px; color: var(--ink-2); }
 .card p { margin: 0; font-size: 11px; color: var(--muted); line-height: 1.6; }
+.card p b { color: var(--ink-2); font-weight: 800; }
+/* 다섯 장 — 큰 금액(70억)도 한 줄에 들어가게 글자를 창 폭에 맞춘다 */
+.cards.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.cards.five .card { padding: 18px 16px; }
+.cards.five .card .value { font-size: clamp(19px, 1.55vw, 26px); white-space: nowrap; word-break: normal; }
 
 /* ── 패널·표 ── */
 .grid-2 { display: grid; grid-template-columns: 1.5fr 1fr; gap: 18px; margin-bottom: 18px; }
@@ -448,6 +453,8 @@ table.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbi
 
 @media (max-width: 1200px) {
   .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cards.five { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cards.five .card .value { font-size: 22px; }
   .grid-2 { grid-template-columns: 1fr; }
   .brand h1 { font-size: 19px; }
 }
@@ -471,7 +478,7 @@ table.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbi
   .chart svg { min-width: 620px; }
 }
 @media (max-width: 520px) {
-  .cards { grid-template-columns: 1fr; gap: 10px; }
+  .cards, .cards.five { grid-template-columns: 1fr; gap: 10px; }
   .card .value { word-break: keep-all; }
 }
 @media print {

@@ -22,8 +22,7 @@ export function BudgetOverview({ year, departments, onSelect, onImported }: { ye
   const perDept = included.map((d) => ({ doc: d, months: accountsMonths(d.accounts) }));
   const months = MONTHS.map((_, m) => perDept.reduce((t, d) => t + d.months[m], 0));
   const total = sum(months);
-  const saved = departments.filter((d) => d.savedAt || d.closed).length;
-  const closed = departments.filter((d) => d.closed).length;
+  const closed = departments.filter((d) => d.closed).length; // 저장은 실시간이라 마감 기준으로 센다
   const accountNames = new Set(departments.flatMap((d) => d.accounts.map((a) => a.name)));
 
   const exportCsv = () =>
@@ -72,7 +71,7 @@ export function BudgetOverview({ year, departments, onSelect, onImported }: { ye
       <div className="cards">
         <StatCard label="전체 연간 예산" value={money(total)} note={`${included.length}개 부서 계정별 예산 합계${excludedNames ? ` · ${excludedNames} 제외` : ""}`} />
         <StatCard label="월평균 예산" value={money(total / 12)} note="연간 예산 ÷ 12개월" />
-        <StatCard label="자료 저장 부서" value={`${saved} / ${departments.length}`} unit="개" note={`마감 ${closed}개 부서`} />
+        <StatCard label="자료 마감 부서" value={`${closed} / ${departments.length}`} unit="개" note={closed === departments.length ? "모든 부서 마감" : `마감 전 ${departments.length - closed}개 부서`} />
         <StatCard label="예산 계정" value={accountNames.size} unit="개" note="전체 부서 계정 기준" />
       </div>
       <div className="grid-2">

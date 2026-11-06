@@ -24,6 +24,9 @@ interface PlanRow {
   feeIndex?: number;
 }
 
+// 마지막 카드에 묶는 채널(마케팅 B2B·샐리필, 온라인고객지원 CS)
+const OTHER_CHANNELS = ["b2b", "seller", "cs"];
+
 // 구분명을 고치거나 지울 줄 — base = 처음 이름
 type NamedRow = Pick<PlanRow, "id" | "label" | "type" | "total"> & { base: string };
 
@@ -67,6 +70,22 @@ export function RevenueOverview({
   const { values, sources, unmatched } = useMemo(() => channelTotals(departments.map((d) => ({ ...d, name: salesDeptName(d) })), channels), [departments, channels]);
   const names = useMemo(() => kindNames(channels, plan), [channels, plan]);
   const metrics = revenueMetrics(values, plan.fees);
+  // 카드용 — 채널 연간 합계, 채널 이름(매출 예산안에서 고친 이름)
+  const channelSum = (key: string) => sum(values[key] ?? []);
+  const channelName = (key: string) => {
+    const channel = channels.find((c) => c.key === key);
+    return channel ? (names[kindOf(channel)] ?? kindOf(channel)) : key;
+  };
+  // "온라인: 2,400,000,000원, 공동구매: …" — 좁은 창에서 줄이 바뀌어도 항목 중간(숫자와 원 사이)에서는 안 끊기게
+  const breakdown = (items: [string, number][]) =>
+    items.map(([name, amount], i) => (
+      <span key={name}>
+        {i > 0 && ", "}
+        <span className="nowrap">
+          {name}: {money(amount)}원
+        </span>
+      </span>
+    ));
   const picked = metas.find((m) => m.code === dept);
   const selected = picked && { ...picked, name: salesDeptName(picked) };
 
@@ -212,11 +231,27 @@ export function RevenueOverview({
         <DeptRevenue key={selected.code} meta={selected} channels={channels} names={names} year={year} onSaved={onDeptSaved} />
       ) : (
         <>
-          <div className="cards">
-            <StatCard label="전체 연간 예상매출" value={money(metrics.erpTotal)} note="ERP 목표 매출액(부서 목표매출 합계)" />
-            <StatCard label="온라인 예상매출" value={money(sum(values.online ?? []))} note="(매출) 온라인 기준" />
-            <StatCard label="오프라인 예상매출" value={money(sum(values.offline ?? []))} note="(매출) 오프라인 기준" />
-            <StatCard label="월평균 예상매출" value={money(metrics.erpTotal / 12)} note="연간 예상매출 ÷ 12개월" />
+          {/* 전체 → 오프라인 → 온라인(+공동구매) → 사업개발(BC) → B2B·샐리필·CS — 매출 구분별로 나눠 다섯 장을 더하면 전체와 같다(지운 채널 제외) */}
+          <div className="cards five">
+            <StatCard
+              label="전체 연간 목표매출"
+              value={money(metrics.erpTotal)}
+              note={
+                <>
+                  ERP 목표 매출액(부서 목표매출 합계)
+                  <br />
+                  <b>월평균 목표매출 {money(metrics.erpTotal / 12)}원</b>
+                </>
+              }
+            />
+            <StatCard label="오프라인 목표매출" value={money(channelSum("offline"))} />
+            <StatCard label="온라인 목표매출" value={money(channelSum("online") + channelSum("group"))} note={breakdown([["온라인", channelSum("online")], ["공동구매", channelSum("group")]])} />
+            <StatCard label="사업개발 목표매출" value={money(channelSum("bc"))} />
+            <StatCard
+              label={`${OTHER_CHANNELS.map(channelName).join("/")} 목표매출`}
+              value={money(sum(OTHER_CHANNELS.map(channelSum)))}
+              note={breakdown(OTHER_CHANNELS.map((key) => [channelName(key), channelSum(key)]))}
+            />
           </div>
           {unmatched.length > 0 && (
             <div className="banner warn">
