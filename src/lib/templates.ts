@@ -37,16 +37,6 @@ export const channels = revenue.channels as Channel[];
 export const revenue2026 = revenue.rows2026 as Revenue2026Row[];
 export const pnlPrior = revenue.pnlPrior as PnlPrior[];
 
-export const rowKey = (account: string, item: string, desc: string) => `${account}\u0000${item}\u0000${desc}`;
-
-// 행별 2026 실적(원본 데이터) — 계정|구분|상세설명 → 12개월
-export function priorFor(code: string): Record<string, number[]> {
-  const t = deptTemplates.find((d) => d.code === code);
-  const out: Record<string, number[]> = {};
-  for (const a of t?.accounts ?? []) for (const r of a.rows) if (r.actual) out[rowKey(a.name, r.item, r.desc)] = r.actual;
-  return out;
-}
-
 // 템플릿상 경영지원 입력 줄인가(이미 만들어진 부서 문서에 잠금을 처음 붙일 때 사용)
 export function templateLocked(code: string, account: string, item: string, desc: string) {
   const t = deptTemplates.find((d) => d.code === code);

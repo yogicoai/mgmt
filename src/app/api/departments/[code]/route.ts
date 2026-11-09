@@ -68,7 +68,7 @@ export const PATCH = handle(async (request: Request, { params }: Context) => {
       const before = current.accounts.find((c) => c.name === a.name);
       const changed = !before || JSON.stringify(rest.rows) !== JSON.stringify(before.rows);
       const lastEdit = changed && !invisible ? stamp : before?.lastEdit;
-      const kept = before?.origin ? { ...rest, origin: before.origin } : rest; // 원래 이름은 서버가 간직한다(2026 실적 찾는 키)
+      const kept = before?.origin ? { ...rest, origin: before.origin } : rest; // 원래 이름은 서버가 간직한다(손익 전년 값 찾는 키)
       return lastEdit ? { ...kept, lastEdit } : kept;
     });
   }

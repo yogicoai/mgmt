@@ -49,7 +49,7 @@ export async function addAccountName(name: string) {
   return changeHidden((hidden) => hidden);
 }
 
-// 이름 수정 — 금액·수정 기록은 그대로. 2026 실적(원본 자료)은 원래 이름(origin)으로 계속 찾는다
+// 이름 수정 — 금액·수정 기록은 그대로. 손익 전년 값(원본 손익표)은 원래 이름(origin)으로 계속 찾는다
 export async function renameAccountName(from: string, to: string) {
   const departments = await listDepartments();
   if (!departments.some((d) => hasName(d, from))) throw new AccountNameError(`‘${from}’ 계정과목이 없습니다.`);

@@ -293,7 +293,6 @@ table.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbi
 .sales-table select { width: 100%; font-size: var(--num-font); padding: 6px 2px; }
 .sales-table tr.reference td { color: var(--muted); background: #fbfcfe; font-weight: 600; }
 
-.detail-table th.prior { white-space: normal; line-height: 1.25; }
 .dept-sales-table tbody.dept-group tr { background: white; }
 .dept-sales-table td.kind { text-align: center; }
 .dept-sales-table .dept-cell { background: #f8fafc !important; vertical-align: top; text-align: left; border-right: 1px solid var(--line-2); }
@@ -408,7 +407,6 @@ table.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbi
 .lock-toggle { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 3px; font-size: 10.5px; font-weight: 700; color: var(--muted); cursor: pointer; }
 .lock-toggle input { margin: 0; }
 .detail-table tr.locked-row td { background: #f6f8fb; }
-.detail-table td.prior { color: var(--muted); font-size: calc(var(--num-font) - 0.5px); }
 .detail-table td.row-actions { text-align: center; white-space: nowrap; }
 .upload-dialog .modal-body p { margin: 0 0 8px; font-size: 13px; }
 .upload-table td:nth-child(-n + 3), .upload-table th:nth-child(-n + 3) { text-align: left; }

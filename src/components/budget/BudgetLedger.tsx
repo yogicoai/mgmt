@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { MONTHS, accountMonths, accountsMonths, filledAccountCount, isSensitiveAccount, money, sum } from "@/lib/budget";
-import { api, downloadFrom, formatTime } from "@/lib/client";
+import { downloadFrom, formatTime } from "@/lib/client";
 import type { BudgetAccount, DepartmentDoc, ReviewComment } from "@/lib/types";
 import { UnlockDialog, useSensitiveAccess } from "../SensitiveGate";
 import { Modal, StatCard, useUi } from "../ui";
@@ -52,7 +52,6 @@ export function BudgetLedger({
   const [query, setQuery] = useState("");
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [prior, setPrior] = useState<Record<string, number[]>>({});
   const fileInput = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<UploadPreview | null>(null);
@@ -61,13 +60,6 @@ export function BudgetLedger({
   const [unlocking, setUnlocking] = useState(false);
   const hiddenAmount = (account: BudgetAccount) => account.masked || (isSensitiveAccount(account) && !sensitive.visible);
 
-  // 행별 2026 실적(원본 자료) — 상세 창 참고 칸. 계정과목 이름을 고치면 새 이름으로 다시 받는다
-  const renamedAccounts = doc.accounts.filter((a) => a.origin).map((a) => a.name).join();
-  useEffect(() => {
-    api<{ prior: Record<string, number[]> }>(`/api/departments/${doc.code}/prior`)
-      .then((r) => setPrior(r.prior))
-      .catch(() => undefined);
-  }, [doc.code, renamedAccounts]);
   const accounts = doc.accounts;
   const months = accountsMonths(accounts);
   const total = sum(months);
@@ -294,7 +286,6 @@ export function BudgetLedger({
           importing={uploading}
           reviews={openReviews[accounts[openIndex].name] ?? []}
           isAdmin={isAdmin}
-          prior={prior}
         />
       )}
       {unlocking && <UnlockDialog onClose={() => setUnlocking(false)} />}

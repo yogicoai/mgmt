@@ -53,7 +53,6 @@ export function AccountDetailDialog({
   importing,
   reviews = [],
   isAdmin = false,
-  prior = {},
 }: {
   deptName: string;
   account: BudgetAccount;
@@ -66,7 +65,6 @@ export function AccountDetailDialog({
   importing?: boolean;
   reviews?: ReviewComment[]; // 이 계정에 남은 경영지원 의견(반영 필요)
   isAdmin?: boolean; // 경영지원 — 잠긴 줄도 입력하고 잠금을 켜고 끈다
-  prior?: Record<string, number[]>; // 행별 2026 실적(원본) — 키 계정\0구분\0상세설명
 }) {
   const { showTip, hideTip, notify } = useUi();
   const [memo, setMemo] = useState<{ row: number; month: number } | null>(null);
@@ -80,8 +78,6 @@ export function AccountDetailDialog({
   const months = accountMonths(account);
   // '경영지원 입력' 줄은 팀 화면에서 조회만
   const canEditRow = (row: BudgetRow) => editable && (isAdmin || !row.locked);
-  const priorOf = (row: BudgetRow) => prior[`${account.name}\u0000${row.item}\u0000${row.desc}`];
-  const priorTotal = sum(rows.map((r) => sum(priorOf(r) ?? [])));
   const lockedCount = rows.filter((r) => r.locked).length;
   const managing = editable && manage;
   const lockControl = (ri: number, row: BudgetRow) =>
@@ -152,7 +148,6 @@ export function AccountDetailDialog({
           <span className="muted">
             {managing ? "고치거나 지울 줄 오른쪽의 [수정]·[삭제]를 누르세요 — 다 하면 [완료]" : editable ? "금액 칸에 숫자 또는 =10000*4 같은 계산식을 입력하면 자동 저장됩니다 · 📝 산출근거 메모" : "마감된 예산 — 조회만 가능합니다"}
             {lockedCount > 0 && !isAdmin ? " · 🔒 줄은 경영지원이 입력" : ""}
-            {priorTotal ? " · 2026 실적은 원본 자료 기준(대부분 1~3월분)" : ""}
           </span>
           <div className="actions">
             {onExport && (
@@ -203,11 +198,11 @@ export function AccountDetailDialog({
             <colgroup>
               <col style={{ width: managing ? "6.3%" : "7%" }} />
               <col style={{ width: managing ? "9%" : "9.5%" }} />
+              {/* 월 칸은 남는 폭을 똑같이 나눈다(2026 실적 칸은 11/9 뺐음 — 원본 1~3월분이라 숫자가 안 맞아 보였다) */}
               {MONTHS.map((m) => (
-                <col key={m} style={{ width: managing ? "5.55%" : "5.9%" }} />
+                <col key={m} />
               ))}
               <col style={{ width: managing ? "6.4%" : "6.8%" }} />
-              <col style={{ width: managing ? "5.6%" : "5.9%" }} />
               {managing && <col style={{ width: "6.1%" }} />}
             </colgroup>
             <thead>
@@ -218,14 +213,12 @@ export function AccountDetailDialog({
                   <th key={m}>{m}</th>
                 ))}
                 <th>연간 합계</th>
-                <th className="prior" title="원본 HTML 데이터의 행별 2026 실적(대부분 1~3월분) — 월별 값은 금액 칸에 마우스를 올리면 보입니다">2026 실적</th>
                 {managing && <th>관리</th>}
               </tr>
             </thead>
             <tbody>
               {rows.map((row, ri) => {
                 const rowEditable = canEditRow(row);
-                const priorRow = priorOf(row);
                 return (
                 <tr key={ri} className={row.locked ? "locked-row" : undefined}>
                   {spans[ri] > 0 && (
@@ -247,7 +240,6 @@ export function AccountDetailDialog({
                             formula={row.formulas?.[m]}
                             readOnly={!rowEditable}
                             label={`${row.item} ${MONTHS[m]} 금액`}
-                            hint={priorRow?.[m] ? `2026년 ${MONTHS[m]} 실적 ${money(priorRow[m])}원` : undefined}
                             onCommit={(value, formula) => setAmount(ri, m, value, formula)}
                           />
                           <button
@@ -268,7 +260,6 @@ export function AccountDetailDialog({
                     );
                   })}
                   <td className="total">{money(rowTotal(row))}</td>
-                  <td className="prior">{priorRow ? money(sum(priorRow)) : ""}</td>
                   {managing && (
                     <td className="row-actions">
                       {rowEditable && (
@@ -294,7 +285,6 @@ export function AccountDetailDialog({
                   <td key={m}>{money(v)}</td>
                 ))}
                 <td>{money(sum(months))}</td>
-                <td className="prior">{priorTotal ? money(priorTotal) : ""}</td>
                 {managing && <td />}
               </tr>
             </tfoot>

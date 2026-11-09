@@ -23,7 +23,7 @@ export interface BudgetAccount {
   rows: BudgetRow[];
   masked?: boolean; // 팀 화면용 — 경영지원 전용 계정이라 금액을 보내지 않음
   lastEdit?: AccountEdit;
-  origin?: string; // 이름을 고친 계정의 원래 이름 — 2026 실적(원본 자료)을 이 이름으로 찾는다
+  origin?: string; // 이름을 고친 계정의 원래 이름 — 손익 전년 값(원본 손익표)을 이 이름으로 찾는다
 }
 
 export interface PersonRow {
