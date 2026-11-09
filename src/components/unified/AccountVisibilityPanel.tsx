@@ -18,7 +18,7 @@ export function AccountVisibilityPanel({ metas, departments, onChanged }: { meta
   const { notify } = useUi();
   const [state, setState] = useState<Visibility | null>(null);
   const [saving, setSaving] = useState(false);
-  const [manage, setManage] = useState(false); // [− 계정과목 수정/삭제]를 눌러야 줄마다 [수정]·[삭제]가 나타난다
+  const [manage, setManage] = useState(false); // 위쪽 [수정]을 눌러야 줄마다 [수정]·[삭제]가 나타나고, 끝나면 [저장](매출 예산안 구분명과 같은 방식)
   const [dialog, setDialog] = useState<{ kind: "add" } | { kind: "rename"; name: string } | { kind: "delete"; name: string } | null>(null);
 
   const load = useCallback(async () => {
@@ -109,8 +109,18 @@ export function AccountVisibilityPanel({ metas, departments, onChanged }: { meta
         </div>
         <div className="actions">
           <span className="muted">{saving ? "저장 중…" : `숨긴 칸 ${hiddenCount}개 · 체크하면 바로 저장`}</span>
-          <button type="button" className={manage ? "" : "danger-solid"} onClick={() => setManage((v) => !v)} aria-pressed={manage} title={manage ? "수정·삭제 끝내기" : "누르면 계정과목마다 [수정]·[삭제] 버튼이 나타납니다"}>
-            {manage ? "완료" : "− 계정과목 수정/삭제"}
+          <button
+            type="button"
+            className="primary"
+            onClick={() => {
+              // 이름 수정·삭제는 창에서 [저장]·[예]를 누를 때 이미 저장된다 — 여기서는 수정 상태를 닫는다
+              if (manage) notify("저장했습니다.");
+              setManage((v) => !v);
+            }}
+            aria-pressed={manage}
+            title={manage ? "수정 끝내기" : "계정과목 수정·삭제 — 누르면 계정과목마다 [수정]·[삭제] 버튼이 나타납니다"}
+          >
+            {manage ? "저장" : "수정"}
           </button>
           <button type="button" className="primary" onClick={() => setDialog({ kind: "add" })}>
             + 계정과목 추가
