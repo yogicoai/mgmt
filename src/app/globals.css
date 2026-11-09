@@ -406,7 +406,11 @@ table.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbi
 .lock-badge { display: inline-block; margin-bottom: 3px; font-size: 10px; font-weight: 800; color: #475569; background: #e2e8f0; border-radius: 10px; padding: 1px 7px; }
 .lock-toggle { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 3px; font-size: 10.5px; font-weight: 700; color: var(--muted); cursor: pointer; }
 .lock-toggle input { margin: 0; }
-.detail-table tr.locked-row td { background: #f6f8fb; }
+/* 팀은 입력할 수 없는 줄 — 확실한 회색(경영지원 화면에서도 같은 색, 입력은 그대로 가능) */
+.detail-table tr.locked-row td { background: #e2e8f0; }
+.detail-table tr.locked-row .money-input { background: #d5dde7; border-color: #bfcad6; color: #334155; }
+.detail-table tr.locked-row .money-input:focus { background: white; }
+.detail-table tr.locked-row .lock-badge { background: #cbd5e1; }
 .detail-table td.row-actions { text-align: center; white-space: nowrap; }
 .upload-dialog .modal-body p { margin: 0 0 8px; font-size: 13px; }
 .upload-table td:nth-child(-n + 3), .upload-table th:nth-child(-n + 3) { text-align: left; }

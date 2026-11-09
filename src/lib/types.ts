@@ -224,7 +224,7 @@ export interface ReviewComment {
   _id: string;
   year: number;
   deptCode: string;
-  account: string | null; // 계정과목(없으면 부서 전체)
+  account: string | null; // 계정과목(없으면 계정과목 전체)
   month: number | null; // 0~11 (없으면 연간)
   text: string;
   author: ReviewAuthor;

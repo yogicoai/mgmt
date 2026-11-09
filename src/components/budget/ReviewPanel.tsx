@@ -7,7 +7,7 @@ import { formatTime } from "@/lib/client";
 import type { ReviewComment } from "@/lib/types";
 import { useUi, type Viewer } from "../ui";
 
-export const reviewTarget = (r: Pick<ReviewComment, "account" | "month">) => (r.account ? `${r.account}${r.month !== null ? ` · ${MONTHS[r.month]}` : ""}` : "부서 전체");
+export const reviewTarget = (r: Pick<ReviewComment, "account" | "month">) => (r.account ? `${r.account}${r.month !== null ? ` · ${MONTHS[r.month]}` : ""}` : "계정과목 전체");
 
 // 경영지원 검토 의견 — 경영지원은 남기고 반영 완료로 닫는다, 팀은 보고 답글
 export function ReviewPanel({ state, viewer, accounts, deptName }: { state: ReviewsState; viewer: Viewer; accounts: string[]; deptName: string }) {
@@ -51,7 +51,7 @@ export function ReviewPanel({ state, viewer, accounts, deptName }: { state: Revi
         <div className="review-form">
           <div className="review-form-row">
             <select value={target} onChange={(e) => setTarget(e.target.value)} aria-label="의견 대상 계정">
-              <option value="">부서 전체</option>
+              <option value="">계정과목 전체</option>
               {accounts.map((a) => (
                 <option key={a} value={a}>
                   {a}
