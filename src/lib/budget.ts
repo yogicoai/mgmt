@@ -37,6 +37,16 @@ export const salesDeptName = (dept: { code: string; name: string }) => SALES_DEP
 const BUDGET_EXCLUDED_DEPTS = new Set(["0020"]);
 export const inBudgetTotal = (code: string) => !BUDGET_EXCLUDED_DEPTS.has(code);
 
+// 계정과목 노출 표의 ‘2027 손익’ 칸 — 숨긴 부서코드 목록에 이 값이 있으면 통합 손익 표에서 그 줄을 뺀다(판관비 합계 계산은 그대로)
+export const PNL_VISIBILITY = "pnl";
+export const hiddenInPnl = (hidden: Record<string, string[]>, name: string) => hidden[name]?.includes(PNL_VISIBILITY) ?? false;
+/** 손익 줄의 2027 금액 — 합산하는 부서(물류 제외)의 그 계정과목 연간 합 */
+export const pnlAccountTotal = (departments: DepartmentDoc[], name: string) =>
+  departments.filter((d) => inBudgetTotal(d.code)).reduce((t, d) => {
+    const account = d.accounts.find((a) => a.name === name);
+    return t + (account ? sum(accountMonths(account)) : 0);
+  }, 0);
+
 export const filledAccountCount = (accounts: BudgetAccount[]) =>
   accounts.filter((a) => a.rows.some((r) => r.values.some((v) => v !== 0))).length;
 

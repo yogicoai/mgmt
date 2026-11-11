@@ -49,6 +49,8 @@ export function UnifiedDashboard({
   const { notify } = useUi();
   const [departments, setDepartments] = useState<DepartmentDoc[] | null>(null);
   const [plan, setPlan] = useState<RevenuePlan | null>(null);
+  // 계정과목 노출 설정 — 손익에서 물류에만 보이는 계정과목 줄을 빼는 데 쓴다
+  const [visibility, setVisibility] = useState<{ hidden: Record<string, string[]>; revision: number }>({ hidden: {}, revision: -1 });
   const [health, setHealth] = useState<Health | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [syncedAt, setSyncedAt] = useState<string | null>(null);
@@ -70,9 +72,14 @@ export function UnifiedDashboard({
 
   const load = useCallback(async () => {
     try {
-      const [d, r] = await Promise.all([api<{ departments: DepartmentDoc[] }>("/api/departments"), api<{ plan: RevenuePlan }>("/api/revenue")]);
+      const [d, r, v] = await Promise.all([
+        api<{ departments: DepartmentDoc[] }>("/api/departments"),
+        api<{ plan: RevenuePlan }>("/api/revenue"),
+        api<{ hidden: Record<string, string[]>; revision: number }>("/api/visibility").catch(() => null), // 못 받으면 지난 설정 그대로
+      ]);
       setDepartments(d.departments);
       setPlan(r.plan);
+      if (v) setVisibility(v);
       setError(null);
       setSyncedAt(new Date().toISOString());
     } catch (e) {
@@ -81,15 +88,16 @@ export function UnifiedDashboard({
   }, []);
 
   // 다른 화면이 저장하면(접속 신호의 저장 번호) 합산·매출 예산안을 바로 다시 — 새로고침 없이
-  const latest = useRef({ departments, plan });
-  latest.current = { departments, plan };
+  const latest = useRef({ departments, plan, visibility });
+  latest.current = { departments, plan, visibility };
   useEffect(() => {
     const onSync = (e: Event) => {
       const sync = (e as CustomEvent<SyncInfo>).detail;
-      const { departments: list, plan: current } = latest.current;
+      const { departments: list, plan: current, visibility: shown } = latest.current;
       if (!list || !current) return;
       const changed =
         (sync.plan !== undefined && sync.plan !== current.revision) ||
+        (sync.visibility !== undefined && sync.visibility !== shown.revision) ||
         Object.values(sync.depts).some((r) => {
           const d = list.find((x) => x.code === r.code);
           return !d || d.closed !== r.closed || (["accounts", "personnel", "sales"] as const).some((s) => d.revisions[s] !== r.revisions[s]);
@@ -253,7 +261,7 @@ export function UnifiedDashboard({
             )}
             {tab === "budget" && <BudgetOverview year={year} departments={departments} onSelect={(code) => choose(`dept-${code}`)} onImported={() => void load()} />}
             {tab === "pnl" && (
-              <PnlOverview year={year} prevYear={prevYear} departments={departments} channels={activeChannels(channels, plan)} plan={plan} pnlPrior={pnlPrior} onPlanSaved={setPlan} viewer={viewer} />
+              <PnlOverview year={year} prevYear={prevYear} departments={departments} channels={activeChannels(channels, plan)} plan={plan} pnlPrior={pnlPrior} hidden={visibility.hidden} onPlanSaved={setPlan} viewer={viewer} />
             )}
             {tab === "personnel" && <PersonnelOverview year={year} departments={departments} />}
             {deptMeta && <DeptLedgerTab key={deptMeta.code} meta={deptMeta} year={year} onSaved={onDeptSaved} viewer={viewer} />}
@@ -267,7 +275,7 @@ export function UnifiedDashboard({
                 ))}
               </div>
             )}
-            {tab === "visibility" && <AccountVisibilityPanel metas={metas} departments={departments} onChanged={load} />}
+            {tab === "visibility" && <AccountVisibilityPanel year={year} metas={metas} departments={departments} pnlPrior={pnlPrior} onChanged={load} onSaved={setVisibility} />}
             {tab === "accounts" && <AccountsPanel year={year} />}
           </>
         )}

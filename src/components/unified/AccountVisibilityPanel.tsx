@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { accountMonths, inBudgetTotal, money, sum } from "@/lib/budget";
+import { PNL_VISIBILITY, accountMonths, inBudgetTotal, isSensitiveAccount, money, pnlAccountTotal, sum } from "@/lib/budget";
 import { api, type ApiError } from "@/lib/client";
-import type { DepartmentDoc, DeptMeta, SyncInfo } from "@/lib/types";
+import type { DepartmentDoc, DeptMeta, PnlPrior, SyncInfo } from "@/lib/types";
 import { SYNC_EVENT } from "../Presence";
 import { ConfirmDialog, NameDialog, useUi } from "../ui";
 
@@ -13,8 +13,22 @@ interface Visibility {
 }
 
 // 계정과목 노출(경영지원) — 계정과목마다 어느 부서 화면에 보일지 체크. 끄면 그 부서 팀 화면·엑셀에서 빠진다.
-//   계정과목 추가·이름 수정·삭제도 여기서(전 부서 공통). 부서명 줄과 계정과목 칸은 틀고정
-export function AccountVisibilityPanel({ metas, departments, onChanged }: { metas: DeptMeta[]; departments: DepartmentDoc[]; onChanged: () => Promise<unknown> }) {
+//   맨 오른쪽 ‘2027 손익’ 칸은 통합 손익 표에 그 줄을 보일지(물류 전용 계정과목 등). 계정과목 추가·이름 수정·삭제도 여기서(전 부서 공통). 부서명 줄과 계정과목 칸은 틀고정
+export function AccountVisibilityPanel({
+  year,
+  metas,
+  departments,
+  pnlPrior,
+  onChanged,
+  onSaved,
+}: {
+  year: number;
+  metas: DeptMeta[];
+  departments: DepartmentDoc[];
+  pnlPrior: PnlPrior[];
+  onChanged: () => Promise<unknown>; // 계정과목 추가·수정·삭제 뒤 — 부서 문서까지 다시
+  onSaved: (visibility: Visibility) => void; // 체크 저장 뒤 — 노출 설정만
+}) {
   const { notify } = useUi();
   const [state, setState] = useState<Visibility | null>(null);
   const [saving, setSaving] = useState(false);
@@ -56,7 +70,9 @@ export function AccountVisibilityPanel({ metas, departments, onChanged }: { meta
     setState({ ...state, hidden }); // 먼저 화면에 반영
     setSaving(true);
     try {
-      setState(await api<Visibility>("/api/visibility", { method: "PUT", body: JSON.stringify({ revision: previous.revision, hidden }) }));
+      const next = await api<Visibility>("/api/visibility", { method: "PUT", body: JSON.stringify({ revision: previous.revision, hidden }) });
+      setState(next);
+      onSaved(next); // 손익 탭도 바로 같은 설정으로
     } catch (e) {
       const err = e as ApiError;
       if (err.status === 409 && err.body) setState({ hidden: (err.body.hidden as Record<string, string[]>) ?? {}, revision: Number(err.body.revision ?? 0) });
@@ -93,10 +109,17 @@ export function AccountVisibilityPanel({ metas, departments, onChanged }: { meta
     const codes = state.hidden[name] ?? [];
     void save({ ...state.hidden, [name]: isHidden(name, code) ? codes.filter((c) => c !== code) : [...codes, code] });
   };
-  // 한 줄 전체: 모두 보이면 → 금액 없는 부서는 모두 숨김 / 하나라도 숨겼으면 → 모두 보이기
+  // 한 줄 전체(부서 칸만): 모두 보이면 → 금액 없는 부서는 모두 숨김 / 하나라도 숨겼으면 → 모두 보이기. ‘손익’ 칸은 그대로 둔다
   const toggleRow = (name: string) => {
     const anyHidden = metas.some((m) => isHidden(name, m.code));
-    void save({ ...state.hidden, [name]: anyHidden ? [] : metas.filter((m) => amountOf(m.code, name) === 0).map((m) => m.code) });
+    const keepPnl = isHidden(name, PNL_VISIBILITY) ? [PNL_VISIBILITY] : [];
+    void save({ ...state.hidden, [name]: [...(anyHidden ? [] : metas.filter((m) => amountOf(m.code, name) === 0).map((m) => m.code)), ...keepPnl] });
+  };
+  const sensitiveNames = new Set(departments.flatMap((d) => d.accounts.filter(isSensitiveAccount).map((a) => a.name)));
+  // 손익 줄 금액 — 2027(물류 제외 합)·2026 실적(이름을 고쳤으면 원래 이름으로). 어느 쪽이든 있으면 손익에서 못 숨김
+  const pnlOf = (name: string) => {
+    const origin = departments[0]?.accounts.find((a) => a.name === name)?.origin ?? name;
+    return { total: pnlAccountTotal(departments, name), prior: pnlPrior.find((p) => p.name === origin)?.prior ?? 0 };
   };
   const hiddenCount = Object.values(state.hidden).reduce((n, codes) => n + codes.length, 0);
 
@@ -105,7 +128,9 @@ export function AccountVisibilityPanel({ metas, departments, onChanged }: { meta
       <div className="section-title">
         <div>
           <h2>계정과목 노출</h2>
-          <span className="muted">계정과목마다 어느 부서 화면에 보일지 정합니다 — 끄면 그 부서 팀 화면의 계정별 예산·엑셀에서 빠집니다(경영지원 화면에는 흐리게 ‘숨김’으로 남음)</span>
+          <span className="muted">
+            계정과목마다 어느 부서 화면에 보일지 정합니다 — 끄면 그 부서 팀 화면의 계정별 예산·엑셀에서 빠집니다(경영지원 화면에는 흐리게 ‘숨김’으로 남음). 맨 오른쪽 ‘{year} 손익’을 미포함으로 하면 {year} 손익 표에서 그 줄이 빠집니다
+          </span>
         </div>
         <div className="actions">
           <span className="muted">{saving ? "저장 중…" : `숨긴 칸 ${hiddenCount}개 · 체크하면 바로 저장`}</span>
@@ -137,15 +162,24 @@ export function AccountVisibilityPanel({ metas, departments, onChanged }: { meta
                 {metas.map((m) => (
                   <th key={m.code}>{m.name}</th>
                 ))}
+                <th className="pnl-col">{year} 손익</th>
               </tr>
             </thead>
             <tbody>
               {names.map((name) => {
                 const shownAll = metas.every((m) => !isHidden(name, m.code));
+                // 합산하지 않는 부서(물류)에만 보이는 계정과목 — 이름 옆에 ‘물류’, 이름 칸 색으로 구분(노출 체크를 바꾸면 따라 바뀜)
+                const shownIn = metas.filter((m) => !isHidden(name, m.code));
+                const excludedOnly = shownIn.length > 0 && shownIn.every((m) => !inBudgetTotal(m.code));
                 return (
-                  <tr key={name}>
+                  <tr key={name} className={excludedOnly ? "excluded-only" : undefined}>
                     <td>
                       <b>{name}</b>
+                      {excludedOnly && (
+                        <span className="only-chip" title={`${shownIn.map((m) => m.name).join("·")} 화면에만 보이는 계정과목 — 금액은 통합 합산에서 빠집니다`}>
+                          {shownIn.map((m) => m.name).join("·")}
+                        </span>
+                      )}
                     </td>
                     <td className={manage ? "row-manage" : undefined}>
                       {manage ? (
@@ -169,14 +203,39 @@ export function AccountVisibilityPanel({ metas, departments, onChanged }: { meta
                       const locked = !hidden && amount !== 0; // 금액이 있으면 숨길 수 없음
                       return (
                         <td key={m.code} className={hidden ? "off" : undefined}>
-                          <label title={locked ? (inBudgetTotal(m.code) ? `금액 ${money(amount)}원이 있어 숨길 수 없습니다` : "금액이 있어 숨길 수 없습니다") : hidden ? `${m.name}에 숨김 — 누르면 보이기` : `${m.name}에 보임 — 누르면 숨기기`}>
+                          <label title={locked ? (inBudgetTotal(m.code) && !sensitiveNames.has(name) ? `금액 ${money(amount)}원이 있어 숨길 수 없습니다` : "금액이 있어 숨길 수 없습니다") : hidden ? `${m.name}에 숨김 — 누르면 보이기` : `${m.name}에 보임 — 누르면 숨기기`}>
                             <input type="checkbox" checked={!hidden} disabled={locked || saving} onChange={() => toggle(name, m.code)} />
                             <span>{hidden ? "숨김" : "보임"}</span>
                           </label>
-                          {amount !== 0 && inBudgetTotal(m.code) && <small>{money(amount)}</small>}
+                          {amount !== 0 && inBudgetTotal(m.code) && !sensitiveNames.has(name) && <small>{money(amount)}</small>}
                         </td>
                       );
                     })}
+                    {(() => {
+                      const { total, prior } = pnlOf(name);
+                      const locked = total !== 0 || prior !== 0; // 손익 줄에 금액이 있으면 미포함으로 못 바꿈(미포함 뒤 금액이 생겨도 손익 표에는 나옴)
+                      const hidden = isHidden(name, PNL_VISIBILITY) && !locked;
+                      // 급여 등 경영지원 전용 계정은 손익 탭처럼 금액을 보이지 않는다(잠김 여부만)
+                      const secret = sensitiveNames.has(name);
+                      const title = locked
+                        ? secret
+                          ? "금액이 있어 미포함으로 바꿀 수 없습니다"
+                          : total !== 0
+                            ? `${year} 손익 금액 ${money(total)}원이 있어 미포함으로 바꿀 수 없습니다`
+                            : `${year - 1} 실적 ${money(prior)}원이 있어 미포함으로 바꿀 수 없습니다`
+                        : hidden
+                          ? `${year} 손익 미포함 — 누르면 포함`
+                          : `${year} 손익 포함 — 누르면 미포함`;
+                      return (
+                        <td className={hidden ? "pnl-col off" : "pnl-col"}>
+                          <label title={title}>
+                            <input type="checkbox" checked={!hidden} disabled={locked || saving} onChange={() => toggle(name, PNL_VISIBILITY)} />
+                            <span>{hidden ? "미포함" : "포함"}</span>
+                          </label>
+                          {!secret && (total !== 0 ? <small>{money(total)}</small> : prior !== 0 && <small>{year - 1} {money(prior)}</small>)}
+                        </td>
+                      );
+                    })()}
                   </tr>
                 );
               })}

@@ -65,6 +65,12 @@ button.link { border: 0; background: none; padding: 0; color: var(--blue); font-
 .visibility-table td label:has(input:disabled) { cursor: not-allowed; }
 .visibility-table td.off { background: #f8fafc; color: var(--muted); }
 .visibility-table td small { display: block; font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+/* 합산 제외 부서(물류)에만 보이는 계정과목 — 이름 칸 연한 주황 + 왼쪽 띠 + ‘물류 전용’ 표시 */
+.visibility-table tbody tr.excluded-only td:first-child { background: #fff7ed; box-shadow: inset 4px 0 0 #fb923c, inset -1px 0 0 var(--line); }
+.only-chip { margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #ffedd5; color: #9a3412; font-size: 10.5px; font-weight: 800; white-space: nowrap; }
+/* 맨 오른쪽 ‘2027 손익’ 칸 — 부서 칸과 구분 */
+.visibility-table .pnl-col { box-shadow: inset 2px 0 0 #94a3b8; }
+.visibility-table thead .pnl-col { color: var(--navy, #1e3a5f); }
 .ledger-table tr.hidden-account td { opacity: 0.5; }
 .masked-cell { color: #94a3b8; letter-spacing: 2px; text-align: center !important; }
 .edit-stamp { display: block; margin-top: 2px; font-size: 10.5px; color: var(--muted); font-weight: 500; }

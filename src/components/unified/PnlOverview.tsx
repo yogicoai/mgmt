@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MONTHS, channelTotals, inBudgetTotal, isSensitiveAccount, money, percent, revenueMetrics, sum } from "@/lib/budget";
+import { MONTHS, channelTotals, hiddenInPnl, inBudgetTotal, isSensitiveAccount, money, percent, revenueMetrics, sum } from "@/lib/budget";
 import { downloadCsv } from "@/lib/client";
 import type { Channel, DepartmentDoc, PnlPrior, RevenuePlan } from "@/lib/types";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -28,6 +28,7 @@ export function PnlOverview({
   channels,
   plan,
   pnlPrior,
+  hidden,
   onPlanSaved,
   viewer,
 }: {
@@ -37,6 +38,7 @@ export function PnlOverview({
   channels: Channel[];
   plan: RevenuePlan;
   pnlPrior: PnlPrior[];
+  hidden: Record<string, string[]>; // 계정과목 노출 설정(계정과목 → 숨긴 부서코드)
   onPlanSaved: (plan: RevenuePlan) => void;
   viewer: Viewer;
 }) {
@@ -62,16 +64,20 @@ export function PnlOverview({
     );
     const sga = MONTHS.map((_, m) => accountMonths.reduce((t, a) => t + a[m], 0));
     const operating = gross.map((v, m) => v - sga[m]);
+    const accountRows = accountList
+      .map((a, i) => ({ label: a.name, months: accountMonths[i], prior: priorOf(a.origin ?? a.name), kind: "account" as const })) // 이름을 고쳐도 전년 값은 원래 이름으로
+      // 계정과목 노출의 ‘손익’ 칸에서 숨긴 줄은 뺀다 — 금액·전년 값이 있으면(설정에서도 못 숨김) 합계와 맞도록 남김
+      .filter((r) => !hiddenInPnl(hidden, r.label) || r.months.some((v) => v !== 0) || (r.prior ?? 0) !== 0);
     return [
       { label: "Ⅰ.매출액", months: revenue, prior: priorOf("Ⅰ.매출액"), kind: "head" },
       { label: "Ⅱ.매출원가", months: cogs, prior: priorOf("Ⅱ.매출원가"), kind: "head" },
       ...plan.cogs.map((c, i) => ({ label: c.label, months: c.values, prior: null, kind: "sub" as const, cogsIndex: i })),
       { label: "Ⅲ.매출총이익", months: gross, prior: priorOf("Ⅲ.매출총이익"), kind: "result" },
-      ...accountList.map((a, i) => ({ label: a.name, months: accountMonths[i], prior: priorOf(a.origin ?? a.name), kind: "account" as const })), // 이름을 고쳐도 전년 값은 원래 이름으로
+      ...accountRows,
       { label: "Ⅳ.판매비와관리비", months: sga, prior: priorOf("Ⅳ.판매비와관리비"), kind: "head" },
       { label: "Ⅴ.영업손익", months: operating, prior: priorOf("Ⅴ.영업손익"), kind: "result" },
     ];
-  }, [departments, channels, plan, pnlPrior]); // priorOf 는 pnlPrior 로만 결정된다
+  }, [departments, channels, plan, pnlPrior, hidden]); // priorOf 는 pnlPrior 로만 결정된다
 
   const get = (label: string) => rows.find((r) => r.label === label)!;
   const total = (label: string) => sum(get(label).months);
