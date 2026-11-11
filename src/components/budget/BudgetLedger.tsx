@@ -15,6 +15,7 @@ interface UploadPreview {
     added: number;
     unchanged: number;
     lockedSkipped: number;
+    newSkipped: number;
     unknownAccounts: string[];
     details: { account: string; item: string; desc: string; before: number; after: number; added?: boolean }[];
   };
@@ -107,7 +108,7 @@ export function BudgetLedger({
       const s = body.summary as UploadPreview["summary"];
       if (!s.changed && !s.added) {
         notify(
-          [`바뀐 금액이 없습니다(같은 행 ${s.unchanged}개).`, s.lockedSkipped ? `🔒 경영지원 입력 줄 ${s.lockedSkipped}개는 건너뜀.` : "", s.unknownAccounts.length ? `없는 계정과목: ${s.unknownAccounts.join(", ")}` : ""]
+          [`바뀐 금액이 없습니다(같은 행 ${s.unchanged}개).`, s.lockedSkipped ? `🔒 경영지원 입력 줄 ${s.lockedSkipped}개는 건너뜀.` : "", s.newSkipped ? `새로 적은 줄 ${s.newSkipped}개는 건너뜀(줄 추가는 경영지원팀).` : "", s.unknownAccounts.length ? `없는 계정과목: ${s.unknownAccounts.join(", ")}` : ""]
             .filter(Boolean)
             .join(" "),
         );
@@ -322,6 +323,7 @@ export function BudgetLedger({
               금액이 바뀌는 행 <b>{preview.summary.changed}개</b> · 새로 추가되는 행 <b>{preview.summary.added}개</b> · 그대로 {preview.summary.unchanged}개
             </p>
             {preview.summary.lockedSkipped > 0 && <p className="muted">🔒 경영지원 입력 줄 {preview.summary.lockedSkipped}개는 바뀐 값이 있어도 건너뜁니다(경영지원만 입력).</p>}
+            {preview.summary.newSkipped > 0 && <p className="muted">파일에 새로 적은 줄 {preview.summary.newSkipped}개는 건너뜁니다(줄 추가는 경영지원팀에서).</p>}
             {preview.summary.unknownAccounts.length > 0 && <p className="muted">이 부서에 없는 계정과목이라 건너뜀: {preview.summary.unknownAccounts.join(", ")}</p>}
             {preview.problems.length > 0 && (
               <p className="muted" style={{ whiteSpace: "pre-line" }}>

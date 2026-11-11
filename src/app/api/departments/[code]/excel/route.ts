@@ -59,6 +59,6 @@ export const POST = handle(async (request: NextRequest, { params }: Context) => 
   if (data.byteLength > MAX_UPLOAD_MB * 1024 * 1024) return fail(`엑셀은 ${MAX_UPLOAD_MB}MB 까지 올릴 수 있습니다.`, 413);
   const { rows, problems } = await readBudgetWorkbook(data);
   const hidden = user.role === "admin" ? [] : await hiddenAccountsFor(code);
-  const { accounts, summary } = mergeUpload(doc.accounts, rows, { canEditLocked: user.role === "admin", hidden });
+  const { accounts, summary } = mergeUpload(doc.accounts, rows, { canEditLocked: user.role === "admin", canAddRows: user.role === "admin", hidden });
   return json({ accounts: user.role === "admin" ? accounts : maskAccountsForTeam(accounts), summary, problems: problems.slice(0, 20), revision: doc.revisions.accounts });
 });

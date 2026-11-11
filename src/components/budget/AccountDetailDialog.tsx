@@ -79,7 +79,9 @@ export function AccountDetailDialog({
   // '경영지원 입력' 줄은 팀 화면에서 조회만
   const canEditRow = (row: BudgetRow) => editable && (isAdmin || !row.locked);
   const lockedCount = rows.filter((r) => r.locked).length;
-  const managing = editable && manage;
+  // 줄 추가·수정·삭제는 경영지원(관리자)만 — 팀은 금액·계산식·메모만 입력(서버도 같은 규칙)
+  const canManageRows = editable && isAdmin;
+  const managing = canManageRows && manage;
   const lockControl = (ri: number, row: BudgetRow) =>
     isAdmin && editable ? (
       <label className="lock-toggle" title="켜면 팀 화면에서 이 줄은 조회만 되고 경영지원만 입력합니다">
@@ -160,12 +162,12 @@ export function AccountDetailDialog({
                 {importing ? "읽는 중…" : "엑셀 업로드"}
               </button>
             )}
-            {editable && rows.some(canEditRow) && (
+            {canManageRows && rows.length > 0 && (
               <button type="button" className={manage ? "" : "danger-solid"} onClick={() => setManage((v) => !v)} aria-pressed={manage} title={manage ? "수정·삭제 끝내기" : "누르면 줄마다 [수정]·[삭제] 버튼이 나타납니다"}>
                 {manage ? "완료" : "− 행 수정/삭제"}
               </button>
             )}
-            {editable && (
+            {canManageRows && (
               <button type="button" className="primary" onClick={() => setRowForm({ index: null, item: "", desc: "", custom: !itemOptions.length })}>
                 + 행 추가
               </button>

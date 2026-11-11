@@ -57,6 +57,11 @@ export const PATCH = handle(async (request: Request, { params }: Context) => {
       patch.accounts.forEach((account, i) => {
         if (hidden.includes(account.name) && JSON.stringify(account.rows) !== JSON.stringify(current.accounts[i].rows)) throw new AuthError(`‘${account.name}’은(는) 이 부서에 노출되지 않는 계정과목입니다.`, 403);
       });
+      // 줄 추가·삭제·구분/상세설명 수정은 경영지원만 — 팀은 금액·계산식·메모만(상세 창 버튼도 경영지원에게만 보인다)
+      const shape = (rows: BudgetRow[]) => JSON.stringify(rows.map((r) => [r.item, r.desc]));
+      patch.accounts.forEach((account, i) => {
+        if (shape(account.rows) !== shape(current.accounts[i].rows)) throw new AuthError(`‘${account.name}’의 줄 추가·삭제·수정은 경영지원팀에서 합니다. 금액과 메모만 입력할 수 있습니다.`, 403);
+      });
     }
   }
   if (patch.accounts) {

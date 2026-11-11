@@ -20,6 +20,7 @@ export interface UploadSummary {
   added: number;
   unchanged: number;
   lockedSkipped: number; // 팀 계정이 올린 파일의 '경영지원 입력' 줄 변경은 건너뜀
+  newSkipped: number; // 팀 계정이 올린 파일에만 있는 새 줄은 건너뜀(줄 추가는 경영지원만)
   unknownAccounts: string[]; // 이 부서에 없는 계정과목
   details: { account: string; item: string; desc: string; before: number; after: number; added?: boolean }[];
 }
@@ -141,11 +142,11 @@ export async function readBudgetWorkbook(data: ArrayBuffer): Promise<{ rows: Upl
 const tidy = (o?: Record<string | number, string>) => JSON.stringify(Object.entries(o ?? {}).filter(([, v]) => v).sort(([a], [b]) => Number(a) - Number(b)));
 
 /** 올린 행을 지금 계정별 예산에 합친 결과(저장은 화면에서 확인 후) */
-export function mergeUpload(accounts: BudgetAccount[], upload: UploadRow[], { canEditLocked, hidden = [] }: { canEditLocked: boolean; hidden?: string[] }) {
+export function mergeUpload(accounts: BudgetAccount[], upload: UploadRow[], { canEditLocked, canAddRows, hidden = [] }: { canEditLocked: boolean; canAddRows: boolean; hidden?: string[] }) {
   const next: BudgetAccount[] = structuredClone(accounts);
   const used = new Set<string>();
   const unknown = new Set<string>();
-  const summary: UploadSummary = { changed: 0, added: 0, unchanged: 0, lockedSkipped: 0, unknownAccounts: [], details: [] };
+  const summary: UploadSummary = { changed: 0, added: 0, unchanged: 0, lockedSkipped: 0, newSkipped: 0, unknownAccounts: [], details: [] };
 
   for (const u of upload) {
     const ai = next.findIndex((a) => norm(a.name) === u.account && !hidden.includes(a.name)); // 이 부서에 숨긴 계정과목은 없는 것으로
@@ -172,6 +173,8 @@ export function mergeUpload(accounts: BudgetAccount[], upload: UploadRow[], { ca
       account.rows[ri] = updated;
       summary.changed++;
       summary.details.push({ account: account.name, item: row.item, desc: row.desc, before: rowTotal(row), after: rowTotal(updated) });
+    } else if (!canAddRows) {
+      summary.newSkipped++;
     } else {
       // 파일에만 있는 행 → 같은 구분 묶음 아래(없으면 맨 아래)에 새 행
       const last = account.rows.map((r) => norm(r.item)).lastIndexOf(u.item);
