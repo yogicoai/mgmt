@@ -73,6 +73,11 @@ export function DeptLedgerTab({ meta, year, onSaved, viewer }: { meta: DeptMeta;
           isAdmin={viewer.isAdmin}
           master={viewer.master}
           hiddenAccounts={hiddenAccounts}
+          onReload={async () => {
+            // 계정과목 순서는 전 부서 공통 — 이 부서 문서를 다시 받고 통합 합산(손익 등)도 새로
+            await state.reload();
+            onSaved();
+          }}
         />
       )}
       {doc && <ReviewPanel state={reviews} viewer={viewer} accounts={doc.accounts.map((a) => a.name)} deptName={meta.name} />}

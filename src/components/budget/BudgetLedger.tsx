@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { useLongPressDrag } from "@/hooks/useLongPressDrag";
 import { MONTHS, accountMonths, accountsMonths, filledAccountCount, isSensitiveAccount, money, sum } from "@/lib/budget";
-import { downloadFrom, formatTime } from "@/lib/client";
+import { api, downloadFrom, formatTime } from "@/lib/client";
 import type { BudgetAccount, DepartmentDoc, ReviewComment } from "@/lib/types";
 import { UnlockDialog, useSensitiveAccess } from "../SensitiveGate";
-import { Modal, StatCard, useUi } from "../ui";
+import { Modal, OrderSaveBar, StatCard, useUi } from "../ui";
 import { AccountDetailDialog } from "./AccountDetailDialog";
 
 interface UploadPreview {
@@ -37,6 +38,7 @@ export function BudgetLedger({
   isAdmin = false,
   master = false,
   hiddenAccounts = NONE,
+  onReload,
 }: {
   doc: DepartmentDoc;
   editable: boolean;
@@ -48,6 +50,7 @@ export function BudgetLedger({
   isAdmin?: boolean; // 경영지원 — '경영지원 입력' 줄도 입력·잠금 전환
   hiddenAccounts?: string[]; // 계정과목 노출 설정에서 이 부서에 숨긴 계정 — 팀 화면에서는 빠지고 경영지원 화면에는 흐리게
   master?: boolean;
+  onReload?: () => Promise<unknown>; // 계정과목 순서를 바꾼 뒤 부서 문서를 다시 받기 — 주면 경영지원은 계정과목 칸을 끌어 순서를 바꿀 수 있다
 }) {
   const { showTip, hideTip, notify } = useUi();
   const [query, setQuery] = useState("");
@@ -73,6 +76,38 @@ export function BudgetLedger({
       .filter(({ account }) => !q || [account.name, ...account.rows.flatMap((r) => [r.item, r.desc])].join("").replace(/\s/g, "").toLowerCase().includes(q));
   }, [accounts, query, isAdmin, hiddenAccounts]);
   const shownAccounts = isAdmin ? accounts : accounts.filter((a) => !hiddenAccounts.includes(a.name));
+
+  // 계정과목 순서 바꾸기(경영지원만, 전 부서 공통) — 계정과목 칸을 누른 채 끌고, 위 [변경내용 저장]을 눌러야 반영
+  const { drag, press, suppressClick } = useLongPressDrag();
+  const tableRef = useRef<HTMLTableElement>(null);
+  const [pendingOrder, setPendingOrder] = useState<string[] | null>(null);
+  const [savingOrder, setSavingOrder] = useState(false);
+  const names = accounts.map((a) => a.name);
+  // 그 사이 계정과목이 추가·삭제되면 저장 안 한 순서는 버린다
+  const pending = pendingOrder && pendingOrder.length === names.length && pendingOrder.every((n) => names.includes(n)) ? pendingOrder : null;
+  const canDragAccounts = isAdmin && Boolean(onReload) && !query.trim() && accounts.length > 1 && !savingOrder;
+  const accountOrder = drag?.group === "ledger-accounts" ? drag.order : (pending ?? names);
+  const rowsShown = drag?.group === "ledger-accounts" || pending ? accountOrder.map((n) => visible.find((v) => v.account.name === n)).filter((v): v is (typeof visible)[number] => v !== undefined) : visible;
+  const dropAccounts = (next: string[]) => setPendingOrder(next.join("\u0000") === names.join("\u0000") ? null : next);
+  const saveAccountOrder = async () => {
+    if (!pending) return;
+    setSavingOrder(true);
+    try {
+      if ((await onBeforeExport?.()) === false) throw new Error("입력 중인 금액을 먼저 저장하지 못했습니다. 잠시 뒤 다시 눌러 주세요.");
+      await api("/api/visibility/accounts", { method: "POST", body: JSON.stringify({ action: "reorder", order: pending }) });
+      setPendingOrder(null);
+      await onReload?.();
+      notify("계정과목 순서를 바꿨습니다(전 부서 공통).");
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e), true);
+    } finally {
+      setSavingOrder(false);
+    }
+  };
+  // 끌고 놓은 직후의 클릭은 무시(상세 창이 열리지 않게)
+  const clickUnlessDragged = (action: () => void) => () => {
+    if (!suppressClick.current) action();
+  };
 
   const monthNotes = (account: BudgetAccount, m: number) =>
     account.rows
@@ -145,11 +180,15 @@ export function BudgetLedger({
       <section className="panel" data-anchor="ledger">
         <div className="panel-head">
           <h3>계정별 월별 예산</h3>
-          <span className="muted">단위: 원 · 계정을 누르면 상세 {editable ? "입력" : "조회"}</span>
+          <span className="muted">
+            단위: 원 · 계정을 누르면 상세 {editable ? "입력" : "조회"}
+            {canDragAccounts ? " · 계정과목 칸을 누른 채 끌면 순서 변경(전 부서 공통)" : ""}
+          </span>
         </div>
         <div className="toolbar">
           <input type="search" placeholder="계정명 · 상세내역 검색" aria-label="계정명 및 상세내역 검색" value={query} onChange={(e) => setQuery(e.target.value)} />
           <div className="actions">
+            {savingOrder ? <span className="chip busy">순서 저장 중…</span> : pending && <OrderSaveBar onSave={() => void saveAccountOrder()} onCancel={() => setPendingOrder(null)} />}
             {actions}
             <button type="button" disabled={exporting} onClick={() => void exportExcel()} title="계정별 요약 + 상세 내역(메모 포함)">
               {exporting ? "만드는 중…" : "엑셀 다운로드"}
@@ -162,7 +201,7 @@ export function BudgetLedger({
           </div>
         </div>
         <div className="tablewrap">
-          <table className="ledger-table fit-table">
+          <table className={`ledger-table fit-table${drag ? " is-dragging" : ""}`} ref={tableRef}>
             <colgroup>
               <col style={{ width: "11%" }} />
               {MONTHS.map((m) => (
@@ -180,26 +219,31 @@ export function BudgetLedger({
               </tr>
             </thead>
             <tbody>
-              {visible.map(({ account, index }) => {
+              {rowsShown.map(({ account, index }) => {
                 const values = accountMonths(account);
                 // 전 줄이 '경영지원 입력'인 계정(직원급여·퇴직급여 등)은 팀 화면에서 상세 창을 열지 않는다
                 const adminOnly = !isAdmin && account.rows.length > 0 && account.rows.every((r) => r.locked);
                 const masked = hiddenAmount(account);
+                const dragging = drag?.group === "ledger-accounts" && drag.id === account.name;
+                const rowClass = [hiddenAccounts.includes(account.name) ? "hidden-account" : "", dragging ? "dragging" : ""].filter(Boolean).join(" ");
+                const namePress = canDragAccounts
+                  ? press("ledger-accounts", account.name, accountOrder, () => [...(tableRef.current?.querySelectorAll<HTMLElement>("tbody tr[data-drag-id]") ?? [])], dropAccounts)
+                  : undefined;
                 return (
-                  <tr key={account.name} className={hiddenAccounts.includes(account.name) ? "hidden-account" : undefined}>
-                    <td>
+                  <tr key={account.name} data-drag-id={account.name} className={rowClass || undefined}>
+                    <td className={canDragAccounts ? "draggable" : undefined} title={canDragAccounts ? "누른 채 위아래로 끌면 계정과목 순서를 바꿉니다(전 부서 공통)" : undefined} {...namePress}>
                       {adminOnly ? (
                         <span className="account-button admin-only" title="경영지원이 입력하는 계정입니다(급여·4대보험 등) — 팀 화면에서는 볼 수 없습니다">
                           {account.name}
                           <span className="lock-chip">🔒 경영지원</span>
                         </span>
                       ) : masked && sensitive.canUnlock ? (
-                        <button type="button" className="account-button" onClick={() => setUnlocking(true)} title="급여 등 경영지원 전용 계정 — 비밀번호를 한 번 더 넣으면 이 창을 닫을 때까지 보입니다">
+                        <button type="button" className="account-button" onClick={clickUnlessDragged(() => setUnlocking(true))} title="급여 등 경영지원 전용 계정 — 비밀번호를 한 번 더 넣으면 이 창을 닫을 때까지 보입니다">
                           {account.name}
                           <span className="lock-chip">🔒 비밀번호 확인</span>
                         </button>
                       ) : (
-                        <button type="button" className="account-button" onClick={() => setOpenIndex(index)} aria-haspopup="dialog">
+                        <button type="button" className="account-button" onClick={clickUnlessDragged(() => setOpenIndex(index))} aria-haspopup="dialog">
                           {account.name}
                           <span>상세</span>
                           {hiddenAccounts.includes(account.name) && (

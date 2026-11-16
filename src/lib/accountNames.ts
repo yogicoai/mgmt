@@ -62,6 +62,26 @@ export async function renameAccountName(from: string, to: string) {
   return changeHidden(({ [from]: codes, ...rest }) => (codes ? { ...rest, [to]: codes } : rest));
 }
 
+// 순서 바꾸기 — 전 부서 공통(마감된 부서도). 받은 이름 순서대로 줄 세우고, 목록에 없는 계정과목(그 사이 추가된 것 등)은 원래 순서대로 맨 뒤에.
+//   계정 내용(금액·메모·수정 기록)은 그대로 — 순서만 바뀐다
+export async function reorderAccountNames(order: string[]) {
+  if (new Set(order).size !== order.length) throw new AccountNameError("계정과목 순서에 같은 이름이 두 번 들어 있습니다.");
+  const departments = await listDepartments();
+  const names = new Set(departments.flatMap((d) => d.accounts.map((a) => a.name)));
+  const unknown = order.filter((name) => !names.has(name));
+  if (unknown.length) throw new AccountNameError(`없는 계정과목이 있습니다(${unknown.join(", ")}). 화면을 새로 고친 뒤 다시 해 주세요.`);
+  const rank = new Map(order.map((name, i) => [name, i]));
+  await patchEveryDept(departments, (accounts) => {
+    const key = (a: BudgetAccount, i: number) => rank.get(a.name) ?? order.length + i;
+    const next = accounts
+      .map((a, i) => ({ a, k: key(a, i) }))
+      .sort((x, y) => x.k - y.k)
+      .map(({ a }) => a);
+    return next.every((a, i) => a === accounts[i]) ? null : next;
+  });
+  return changeHidden((hidden) => hidden);
+}
+
 // 삭제 — 금액·메모가 남은 부서가 있으면 막는다(합계가 줄고 적어 둔 근거가 사라지므로)
 export async function deleteAccountName(name: string) {
   const departments = await listDepartments();

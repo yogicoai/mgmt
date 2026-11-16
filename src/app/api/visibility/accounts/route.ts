@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { AccountNameError, addAccountName, deleteAccountName, renameAccountName } from "@/lib/accountNames";
+import { AccountNameError, addAccountName, deleteAccountName, renameAccountName, reorderAccountNames } from "@/lib/accountNames";
 import { requireAdmin } from "@/lib/auth/guard";
 import { fail, handle, json } from "@/lib/http";
 
-// 계정과목 추가·이름 수정·삭제(경영지원) — 전 부서 공통. 응답은 바뀐 노출 설정
+// 계정과목 추가·이름 수정·삭제·순서 바꾸기(경영지원) — 전 부서 공통. 응답은 바뀐 노출 설정
 const newName = z
   .string()
   .trim()
@@ -16,6 +16,7 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("add"), name: newName }),
   z.object({ action: z.literal("rename"), name: oldName, to: newName }),
   z.object({ action: z.literal("delete"), name: oldName }),
+  z.object({ action: z.literal("reorder"), order: z.array(oldName).min(1).max(200) }),
 ]);
 
 export const POST = handle(async (request: Request) => {
@@ -24,6 +25,7 @@ export const POST = handle(async (request: Request) => {
   try {
     if (body.action === "add") return json(await addAccountName(body.name));
     if (body.action === "rename") return json(await renameAccountName(body.name, body.to));
+    if (body.action === "reorder") return json(await reorderAccountNames(body.order));
     return json(await deleteAccountName(body.name));
   } catch (e) {
     if (e instanceof AccountNameError) return fail(e.message);

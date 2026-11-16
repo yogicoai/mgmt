@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useLongPressDrag } from "@/hooks/useLongPressDrag";
 import { MONTHS, accountMonths, money, rowTotal, sum, zeros } from "@/lib/budget";
 import { formatTime } from "@/lib/client";
 import type { BudgetAccount, BudgetRow, ReviewComment } from "@/lib/types";
-import { Modal, useUi } from "../ui";
+import { Modal, OrderSaveBar, useUi } from "../ui";
 import { MemoDialog } from "./MemoDialog";
 import { MoneyInput } from "./MoneyInput";
 
@@ -31,14 +32,15 @@ function DescLines({ text }: { text: string }) {
 // 행 추가·수정 창의 구분 선택에서 '새 구분 직접 입력'
 const NEW_ITEM = "__new_item__";
 
-// 같은 구분이 이어지면 구분 칸을 합친다
-function itemSpans(rows: BudgetRow[]) {
-  return rows.map((row, i) => {
-    if (i > 0 && rows[i - 1].item === row.item) return 0;
-    let n = 1;
-    while (i + n < rows.length && rows[i + n].item === row.item) n++;
-    return n;
+// 같은 구분이 이어지는 줄 묶음 — 구분 칸을 합치고, 구분 순서 바꾸기도 이 묶음째로 옮긴다
+const DRAG_GROUP = "detail-items";
+function itemGroups(rows: BudgetRow[]) {
+  const groups: { id: string; indices: number[] }[] = [];
+  rows.forEach((row, i) => {
+    if (i > 0 && rows[i - 1].item === row.item) groups[groups.length - 1].indices.push(i);
+    else groups.push({ id: `${i}:${row.item}`, indices: [i] });
   });
+  return groups;
 }
 
 export function AccountDetailDialog({
@@ -73,15 +75,37 @@ export function AccountDetailDialog({
   // 행 수정·삭제 모드 — 아래 [− 행 수정/삭제]를 눌러야 줄마다 [수정]·[삭제]가 나타난다
   const [manage, setManage] = useState(false);
   const rows = account.rows;
-  const spans = itemSpans(rows);
   const itemOptions = [...new Set(rows.map((r) => r.item).filter(Boolean))];
   const months = accountMonths(account);
   // '경영지원 입력' 줄은 팀 화면에서 조회만
   const canEditRow = (row: BudgetRow) => editable && (isAdmin || !row.locked);
   const lockedCount = rows.filter((r) => r.locked).length;
-  // 줄 추가·수정·삭제는 경영지원(관리자)만 — 팀은 금액·계산식·메모만 입력(서버도 같은 규칙)
+  // 줄 추가·수정·삭제·구분 순서 바꾸기는 경영지원(관리자)만 — 팀은 금액·계산식·메모만 입력(서버도 같은 규칙)
   const canManageRows = editable && isAdmin;
   const managing = canManageRows && manage;
+
+  // 구분 순서 바꾸기 — 구분 칸을 누른 채 끌면 묶음째 옮기고, 아래 [변경내용 저장]을 눌러야 반영(전체 매출 현황과 같은 방식)
+  const { drag, press } = useLongPressDrag();
+  const tableRef = useRef<HTMLTableElement>(null);
+  const [pendingOrder, setPendingOrder] = useState<string[] | null>(null);
+  const groups = itemGroups(rows);
+  const groupIds = groups.map((g) => g.id);
+  // 끄는 사이 다른 화면 저장 등으로 줄 구성이 바뀌면 저장 안 한 순서는 버린다
+  const pending = pendingOrder && pendingOrder.length === groupIds.length && pendingOrder.every((id) => groupIds.includes(id)) ? pendingOrder : null;
+  const order = drag?.group === DRAG_GROUP ? drag.order : (pending ?? groupIds);
+  const shownGroups = order.map((id) => groups.find((g) => g.id === id)).filter((g): g is (typeof groups)[number] => g !== undefined);
+  const canDrag = canManageRows && groups.length > 1 && !rowForm;
+  const dropOrder = (next: string[]) => setPendingOrder(next.join() === groupIds.join() ? null : next);
+  const saveOrder = () => {
+    if (!pending) return;
+    onChange({ ...account, rows: pending.flatMap((id) => groups.find((g) => g.id === id)!.indices.map((i) => rows[i])) });
+    setPendingOrder(null);
+    notify("구분 순서를 바꿨습니다.");
+  };
+  const close = () => {
+    if (pending && !confirm("구분 순서 변경을 저장하지 않았습니다. 저장하지 않고 닫을까요?")) return;
+    onClose();
+  };
   const lockControl = (ri: number, row: BudgetRow) =>
     isAdmin && editable ? (
       <label className="lock-toggle" title="켜면 팀 화면에서 이 줄은 조회만 되고 경영지원만 입력합니다">
@@ -144,13 +168,18 @@ export function AccountDetailDialog({
     <Modal
       className="detail-dialog"
       title={`${deptName} · ${account.name} · 상세 예산 ${editable ? "입력" : "조회"}`}
-      onClose={onClose}
+      onClose={close}
       footer={
         <>
-          <span className="muted">
-            {managing ? "고치거나 지울 줄 오른쪽의 [수정]·[삭제]를 누르세요 — 다 하면 [완료]" : editable ? "금액 칸에 숫자 또는 =10000*4 같은 계산식을 입력하면 자동 저장됩니다 · 📝 산출근거 메모" : "마감된 예산 — 조회만 가능합니다"}
-            {lockedCount > 0 && !isAdmin ? " · 🔒 줄은 경영지원이 입력" : ""}
-          </span>
+          {pending ? (
+            <OrderSaveBar onSave={saveOrder} onCancel={() => setPendingOrder(null)} />
+          ) : (
+            <span className="muted">
+              {managing ? "고치거나 지울 줄 오른쪽의 [수정]·[삭제]를 누르세요 — 다 하면 [완료]" : editable ? "금액 칸에 숫자 또는 =10000*4 같은 계산식을 입력하면 자동 저장됩니다 · 📝 산출근거 메모" : "마감된 예산 — 조회만 가능합니다"}
+              {canDrag && !managing ? " · 구분 칸을 누른 채 끌면 순서 변경" : ""}
+              {lockedCount > 0 && !isAdmin ? " · 🔒 줄은 경영지원이 입력" : ""}
+            </span>
+          )}
           <div className="actions">
             {onExport && (
               <button type="button" disabled={exporting} onClick={onExport} title="이 표 그대로 엑셀로(메모는 엑셀 메모, 계산식은 수식)">
@@ -163,12 +192,25 @@ export function AccountDetailDialog({
               </button>
             )}
             {canManageRows && rows.length > 0 && (
-              <button type="button" className={manage ? "" : "danger-solid"} onClick={() => setManage((v) => !v)} aria-pressed={manage} title={manage ? "수정·삭제 끝내기" : "누르면 줄마다 [수정]·[삭제] 버튼이 나타납니다"}>
+              <button
+                type="button"
+                className={manage ? "" : "danger-solid"}
+                disabled={Boolean(pending)}
+                onClick={() => setManage((v) => !v)}
+                aria-pressed={manage}
+                title={pending ? "구분 순서 변경을 먼저 저장하거나 취소해 주세요" : manage ? "수정·삭제 끝내기" : "누르면 줄마다 [수정]·[삭제] 버튼이 나타납니다"}
+              >
                 {manage ? "완료" : "− 행 수정/삭제"}
               </button>
             )}
             {canManageRows && (
-              <button type="button" className="primary" onClick={() => setRowForm({ index: null, item: "", desc: "", custom: !itemOptions.length })}>
+              <button
+                type="button"
+                className="primary"
+                disabled={Boolean(pending)}
+                title={pending ? "구분 순서 변경을 먼저 저장하거나 취소해 주세요" : undefined}
+                onClick={() => setRowForm({ index: null, item: "", desc: "", custom: !itemOptions.length })}
+              >
                 + 행 추가
               </button>
             )}
@@ -196,7 +238,7 @@ export function AccountDetailDialog({
           </div>
         )}
         <div className="tablewrap">
-          <table className="detail-table fit-table">
+          <table className={`detail-table fit-table${drag ? " is-dragging" : ""}`} ref={tableRef}>
             <colgroup>
               <col style={{ width: managing ? "6.3%" : "7%" }} />
               <col style={{ width: managing ? "9%" : "9.5%" }} />
@@ -218,13 +260,26 @@ export function AccountDetailDialog({
                 {managing && <th>관리</th>}
               </tr>
             </thead>
-            <tbody>
-              {rows.map((row, ri) => {
+            {/* 구분 묶음마다 tbody 하나 — 끌 때 합친 구분 칸째로 움직인다 */}
+            {shownGroups.map((group) => {
+              const itemPress = canDrag
+                ? press(DRAG_GROUP, group.id, order, () => [...(tableRef.current?.querySelectorAll<HTMLElement>("tbody.detail-group") ?? [])], dropOrder)
+                : undefined;
+              const dragging = drag?.group === DRAG_GROUP && drag.id === group.id;
+              return (
+              <tbody key={group.id} className={`detail-group${dragging ? " dragging" : ""}`} data-drag-id={group.id}>
+              {group.indices.map((ri, k) => {
+                const row = rows[ri];
                 const rowEditable = canEditRow(row);
                 return (
                 <tr key={ri} className={row.locked ? "locked-row" : undefined}>
-                  {spans[ri] > 0 && (
-                    <td className="item" rowSpan={spans[ri]}>
+                  {k === 0 && (
+                    <td
+                      className={`item${canDrag ? " draggable" : ""}`}
+                      rowSpan={group.indices.length}
+                      title={canDrag ? "누른 채 위아래로 끌면 구분 순서를 바꿉니다" : undefined}
+                      {...itemPress}
+                    >
                       {row.item}
                     </td>
                   )}
@@ -264,7 +319,7 @@ export function AccountDetailDialog({
                   <td className="total">{money(rowTotal(row))}</td>
                   {managing && (
                     <td className="row-actions">
-                      {rowEditable && (
+                      {rowEditable && !pending && (
                         <>
                           <button type="button" onClick={() => setRowForm({ index: ri, item: row.item, desc: row.desc, custom: !row.item })} aria-label={`${row.item} 행 수정`}>
                             수정
@@ -279,7 +334,9 @@ export function AccountDetailDialog({
                 </tr>
                 );
               })}
-            </tbody>
+              </tbody>
+              );
+            })}
             <tfoot>
               <tr>
                 <td colSpan={2}>{account.name} 합계</td>

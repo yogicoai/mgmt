@@ -204,6 +204,7 @@ export function DeptDashboard({
             isAdmin={viewer.isAdmin}
             master={viewer.master}
             hiddenAccounts={hiddenAccounts}
+            onReload={viewer.isAdmin ? state.reload : undefined}
             actions={
               editable && (
                 <>
