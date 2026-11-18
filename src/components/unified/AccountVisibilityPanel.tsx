@@ -228,23 +228,13 @@ export function AccountVisibilityPanel({
                     })()}
                     {(() => {
                       const { total, prior } = pnlOf(name);
-                      const locked = total !== 0 || prior !== 0; // 손익 줄에 금액이 있으면 미포함으로 못 바꿈(미포함 뒤 금액이 생겨도 손익 표에는 나옴)
-                      const hidden = isHidden(name, PNL_VISIBILITY) && !locked;
-                      // 급여 등 경영지원 전용 계정은 손익 탭처럼 금액을 보이지 않는다(잠김 여부만)
+                      const hidden = isHidden(name, PNL_VISIBILITY); // 금액이 있어도 미포함으로 둘 수 있다(물류처럼 손익·판관비에서 빠짐)
+                      // 급여 등 경영지원 전용 계정은 손익 탭처럼 금액을 보이지 않는다
                       const secret = sensitiveNames.has(name);
-                      const title = locked
-                        ? secret
-                          ? "금액이 있어 미포함으로 바꿀 수 없습니다"
-                          : total !== 0
-                            ? `${year} 손익 금액 ${money(total)}원이 있어 미포함으로 바꿀 수 없습니다`
-                            : `${year - 1} 실적 ${money(prior)}원이 있어 미포함으로 바꿀 수 없습니다`
-                        : hidden
-                          ? `${year} 손익 미포함 — 누르면 포함`
-                          : `${year} 손익 포함 — 누르면 미포함`;
                       return (
                         <td className={hidden ? "pnl-col off" : "pnl-col"}>
-                          <label title={title}>
-                            <input type="checkbox" checked={!hidden} disabled={locked || saving} onChange={() => toggle(name, PNL_VISIBILITY)} />
+                          <label title={hidden ? `${year} 손익 미포함 — 누르면 포함(판관비 합계에 들어감)` : `${year} 손익 포함 — 누르면 미포함(물류처럼 ${year} 손익·판관비에서 빠짐, 금액이 있어도 가능)`}>
+                            <input type="checkbox" checked={!hidden} disabled={saving} onChange={() => toggle(name, PNL_VISIBILITY)} />
                             <span>{hidden ? "미포함" : "포함"}</span>
                           </label>
                           {!secret && (total !== 0 ? <small>{money(total)}</small> : prior !== 0 && <small>{year - 1} {money(prior)}</small>)}

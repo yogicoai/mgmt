@@ -57,17 +57,15 @@ export function PnlOverview({
     const revenue = revenueMetrics(values, plan.fees).net;
     const cogs = MONTHS.map((_, m) => plan.cogs.reduce((s, r) => s + (r.values[m] || 0), 0));
     const gross = revenue.map((v, m) => v - cogs[m]);
-    const accountList = departments[0]?.accounts ?? [];
+    // 계정과목 노출의 ‘2027 손익’ 칸에서 미포함한 계정은 판관비 합계·표에서 모두 뺀다(물류처럼 — 금액이 있어도 제외)
+    const accountList = (departments[0]?.accounts ?? []).filter((a) => !hiddenInPnl(hidden, a.name));
     const accountNames = accountList.map((a) => a.name);
     const accountMonths = accountNames.map((name) =>
       MONTHS.map((_, m) => departments.filter((d) => inBudgetTotal(d.code)).reduce((t, d) => t + (d.accounts.find((a) => a.name === name)?.rows.reduce((s, r) => s + (r.values[m] || 0), 0) ?? 0), 0)),
     );
     const sga = MONTHS.map((_, m) => accountMonths.reduce((t, a) => t + a[m], 0));
     const operating = gross.map((v, m) => v - sga[m]);
-    const accountRows = accountList
-      .map((a, i) => ({ label: a.name, months: accountMonths[i], prior: priorOf(a.origin ?? a.name), kind: "account" as const })) // 이름을 고쳐도 전년 값은 원래 이름으로
-      // 계정과목 노출의 ‘손익’ 칸에서 숨긴 줄은 뺀다 — 금액·전년 값이 있으면(설정에서도 못 숨김) 합계와 맞도록 남김
-      .filter((r) => !hiddenInPnl(hidden, r.label) || r.months.some((v) => v !== 0) || (r.prior ?? 0) !== 0);
+    const accountRows = accountList.map((a, i) => ({ label: a.name, months: accountMonths[i], prior: priorOf(a.origin ?? a.name), kind: "account" as const })); // 이름을 고쳐도 전년 값은 원래 이름으로
     return [
       { label: "Ⅰ.매출액", months: revenue, prior: priorOf("Ⅰ.매출액"), kind: "head" },
       { label: "Ⅱ.매출원가", months: cogs, prior: priorOf("Ⅱ.매출원가"), kind: "head" },

@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { requireAdmin, requireDept } from "@/lib/auth/guard";
-import { BUDGET_VISIBILITY, PNL_VISIBILITY, accountMonths, isSensitiveAccount, money, pnlAccountTotal, sum } from "@/lib/budget";
+import { BUDGET_VISIBILITY, PNL_VISIBILITY, accountMonths, money, sum } from "@/lib/budget";
 import { listDepartments } from "@/lib/departments";
 import { fail, handle, json } from "@/lib/http";
 import { getStore } from "@/lib/store";
-import { BUDGET_YEAR, findDeptMeta, pnlPrior } from "@/lib/templates";
+import { BUDGET_YEAR, findDeptMeta } from "@/lib/templates";
 import { hiddenAccountsFor } from "@/lib/visibility";
 
 // 계정과목 노출 설정
@@ -31,23 +31,11 @@ export const PUT = handle(async (request: Request) => {
   const body = schema.parse(await request.json());
   const departments = await listDepartments();
   const names = new Set(departments.flatMap((d) => d.accounts.map((a) => a.name)));
-  const before = await getStore().getVisibility(BUDGET_YEAR);
   const hidden: Record<string, string[]> = {};
   for (const [name, codes] of Object.entries(body.hidden)) {
     if (!names.has(name)) return fail(`‘${name}’ 계정과목이 없습니다.`);
     const unique = [...new Set(codes)].filter((code) => code === PNL_VISIBILITY || code === BUDGET_VISIBILITY || findDeptMeta(code));
-    // ‘2027 손익’ 칸 — 손익 줄에 금액(물류 제외 2027 또는 2026 실적)이 있으면 새로 숨길 수 없다(보이는 줄 합 = 판관비 합계).
-    //   이미 숨긴 뒤 금액이 생긴 줄은 손익 화면이 알아서 다시 보여 주므로 다른 칸 저장을 막지 않는다
-    if (unique.includes(PNL_VISIBILITY) && !before?.hidden[name]?.includes(PNL_VISIBILITY)) {
-      const origin = departments.flatMap((d) => d.accounts).find((a) => a.name === name)?.origin ?? name;
-      const total = pnlAccountTotal(departments, name);
-      const prior = pnlPrior.find((p) => p.name === origin)?.prior ?? 0;
-      // 급여 등 경영지원 전용 계정은 안내에도 금액을 넣지 않는다(손익 탭은 비밀번호 확인 전 가림)
-      const secret = departments.some((d) => d.accounts.some((a) => a.name === name && isSensitiveAccount(a)));
-      if (total !== 0) return fail(`‘${name}’은(는) ${BUDGET_YEAR} 손익 금액${secret ? "" : `(${money(total)}원)`}이 있어 손익 미포함으로 바꿀 수 없습니다.`);
-      if (prior !== 0) return fail(`‘${name}’은(는) ${BUDGET_YEAR - 1} 실적${secret ? "" : `(${money(prior)}원)`}이 있어 손익 미포함으로 바꿀 수 없습니다.`);
-    }
-    // ‘전체 예산’ 미포함(budget)은 금액이 있어도 설정할 수 있다(물류처럼 합산만 제외) — 부서 숨김(dept code)만 금액을 막는다
+    // ‘2027 손익’(pnl)·‘전체 예산’(budget) 미포함은 금액이 있어도 설정할 수 있다 — 물류처럼 그 계정과목을 손익·전체 합계에서 통째로 뺀다. 부서 숨김(dept code)만 금액을 막는다
     for (const code of unique.filter((c) => c !== PNL_VISIBILITY && c !== BUDGET_VISIBILITY)) {
       const doc = departments.find((d) => d.code === code);
       const account = doc?.accounts.find((a) => a.name === name);
