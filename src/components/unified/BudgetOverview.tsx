@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MONTHS, accountsMonths, departmentStatus, inBudgetTotal, money, sum } from "@/lib/budget";
+import { MONTHS, accountMonths, budgetAccountsMonths, departmentStatus, hiddenInBudget, inBudgetTotal, money, sum } from "@/lib/budget";
 import { api, downloadCsv } from "@/lib/client";
 import type { DepartmentDoc } from "@/lib/types";
 import { BarChart, RankBars } from "../charts";
 import { Modal, StatCard, useUi } from "../ui";
 
-// 전체 예산 현황 — 부서 문서의 계정별 예산을 그대로 합산(원본 renderOverview)
-export function BudgetOverview({ year, departments, onSelect, onImported }: { year: number; departments: DepartmentDoc[]; onSelect: (code: string) => void; onImported: () => void }) {
+// 전체 예산 현황 — 부서 문서의 계정별 예산을 그대로 합산(원본 renderOverview). ‘전체 예산’ 미포함(물류식) 계정과목은 합산에서 뺀다.
+export function BudgetOverview({ year, departments, hidden, onSelect, onImported }: { year: number; departments: DepartmentDoc[]; hidden: Record<string, string[]>; onSelect: (code: string) => void; onImported: () => void }) {
   const [importing, setImporting] = useState(false);
   const [reviewCounts, setReviewCounts] = useState<Record<string, { open: number; total: number }>>({});
   useEffect(() => {
@@ -19,11 +19,15 @@ export function BudgetOverview({ year, departments, onSelect, onImported }: { ye
   // 물류는 합산에서 뺀다 — 표에는 상태만 남기고 금액은 물류 탭에서만
   const included = departments.filter((d) => inBudgetTotal(d.code));
   const excluded = departments.filter((d) => !inBudgetTotal(d.code));
-  const perDept = included.map((d) => ({ doc: d, months: accountsMonths(d.accounts) }));
+  // ‘전체 예산’ 미포함 계정과목은 부서별 월합에서도 뺀다(물류식 — 팀 원장엔 남고 전체 합계에서만 빠짐)
+  const perDept = included.map((d) => ({ doc: d, months: budgetAccountsMonths(d.accounts, hidden) }));
   const months = MONTHS.map((_, m) => perDept.reduce((t, d) => t + d.months[m], 0));
   const total = sum(months);
   const closed = departments.filter((d) => d.closed).length; // 저장은 실시간이라 마감 기준으로 센다
   const accountNames = new Set(departments.flatMap((d) => d.accounts.map((a) => a.name)));
+  // 합산 제외(전체 예산 미포함) 계정과목 — 안내용. 합산 대상 부서에서 뺀 연간 금액도 모은다
+  const budgetExcludedNames = [...new Set(included.flatMap((d) => d.accounts.filter((a) => hiddenInBudget(hidden, a.name)).map((a) => a.name)))];
+  const budgetExcludedTotal = included.reduce((t, d) => t + d.accounts.filter((a) => hiddenInBudget(hidden, a.name)).reduce((s, a) => s + sum(accountMonths(a)), 0), 0);
 
   const exportCsv = () =>
     downloadCsv(`${year}_예산원장_통합.csv`, [
@@ -69,7 +73,7 @@ export function BudgetOverview({ year, departments, onSelect, onImported }: { ye
         </div>
       </div>
       <div className="cards">
-        <StatCard label="전체 연간 예산" value={money(total)} note={`${included.length}개 부서 계정별 예산 합계${excludedNames ? ` · ${excludedNames} 제외` : ""}`} />
+        <StatCard label="전체 연간 예산" value={money(total)} note={`${included.length}개 부서 계정별 예산 합계${excludedNames ? ` · ${excludedNames} 제외` : ""}${budgetExcludedNames.length ? ` · 합산 제외 계정 ${budgetExcludedNames.length}개` : ""}`} />
         <StatCard label="월평균 예산" value={money(total / 12)} note="연간 예산 ÷ 12개월" />
         <StatCard label="자료 마감 부서" value={`${closed} / ${departments.length}`} unit="개" note={closed === departments.length ? "모든 부서 마감" : `마감 전 ${departments.length - closed}개 부서`} />
         <StatCard label="예산 계정" value={accountNames.size} unit="개" note="전체 부서 계정 기준" />
@@ -157,6 +161,11 @@ export function BudgetOverview({ year, departments, onSelect, onImported }: { ye
             </tfoot>
           </table>
         </div>
+        {budgetExcludedNames.length > 0 && (
+          <p className="muted" style={{ marginTop: 8 }}>
+            합산 제외 계정과목: <b>{budgetExcludedNames.join(", ")}</b> — 부서 원장·팀 화면에는 그대로 있고, 위 합계에서만 빠집니다{budgetExcludedTotal ? ` (연 ${money(budgetExcludedTotal)}원)` : ""}
+          </p>
+        )}
       </section>
       {importing && <ImportDialog onClose={() => setImporting(false)} onImported={onImported} />}
     </>

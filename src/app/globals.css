@@ -68,6 +68,10 @@ button.link { border: 0; background: none; padding: 0; color: var(--blue); font-
 /* 합산 제외 부서(물류)에만 보이는 계정과목 — 이름 칸 연한 주황 + 왼쪽 띠 + ‘물류 전용’ 표시 */
 .visibility-table tbody tr.excluded-only td:first-child { background: #fff7ed; box-shadow: inset 4px 0 0 #fb923c, inset -1px 0 0 var(--line); }
 .only-chip { margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #ffedd5; color: #9a3412; font-size: 10.5px; font-weight: 800; white-space: nowrap; }
+/* ‘전체 예산’ 합산 포함/제외 칸 — 초록 띠로 구분(물류식 합산 제외) */
+.visibility-table .budget-col { box-shadow: inset 2px 0 0 #10b981; }
+.visibility-table thead .budget-col { color: #047857; }
+.visibility-table td.budget-col.off { background: #f0fdf4; }
 /* 맨 오른쪽 ‘2027 손익’ 칸 — 부서 칸과 구분 */
 .visibility-table .pnl-col { box-shadow: inset 2px 0 0 #94a3b8; }
 .visibility-table thead .pnl-col { color: var(--navy, #1e3a5f); }

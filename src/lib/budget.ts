@@ -40,6 +40,14 @@ export const inBudgetTotal = (code: string) => !BUDGET_EXCLUDED_DEPTS.has(code);
 // 계정과목 노출 표의 ‘2027 손익’ 칸 — 숨긴 부서코드 목록에 이 값이 있으면 통합 손익 표에서 그 줄을 뺀다(판관비 합계 계산은 그대로)
 export const PNL_VISIBILITY = "pnl";
 export const hiddenInPnl = (hidden: Record<string, string[]>, name: string) => hidden[name]?.includes(PNL_VISIBILITY) ?? false;
+
+// 계정과목 노출 표의 ‘전체 예산’ 칸 — 숨긴 부서코드 목록에 이 값이 있으면 전체 예산 현황 합산에서 그 계정과목을 뺀다.
+//   물류(합산 제외 부서)와 같은 뜻 — 팀 화면·입력·부서 원장은 그대로이고, 통합 합계에서만 빠진다('숨김'과 달리 금액이 있어도 설정할 수 있고 팀이 못 보게 막지 않는다).
+export const BUDGET_VISIBILITY = "budget";
+export const hiddenInBudget = (hidden: Record<string, string[]>, name: string) => hidden[name]?.includes(BUDGET_VISIBILITY) ?? false;
+// 전체 예산 현황 합산용 월별 합 — ‘전체 예산’ 미포함 계정과목은 뺀다
+export const budgetAccountsMonths = (accounts: BudgetAccount[], hidden: Record<string, string[]>) =>
+  MONTHS.map((_, m) => accounts.reduce((t, a) => (hiddenInBudget(hidden, a.name) ? t : t + a.rows.reduce((s, r) => s + (r.values[m] || 0), 0)), 0));
 /** 손익 줄의 2027 금액 — 합산하는 부서(물류 제외)의 그 계정과목 연간 합 */
 export const pnlAccountTotal = (departments: DepartmentDoc[], name: string) =>
   departments.filter((d) => inBudgetTotal(d.code)).reduce((t, d) => {

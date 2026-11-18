@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { PNL_VISIBILITY, accountMonths, inBudgetTotal, isSensitiveAccount, money, pnlAccountTotal, sum } from "@/lib/budget";
+import { BUDGET_VISIBILITY, PNL_VISIBILITY, accountMonths, inBudgetTotal, isSensitiveAccount, money, pnlAccountTotal, sum } from "@/lib/budget";
 import { api, type ApiError } from "@/lib/client";
 import type { DepartmentDoc, DeptMeta, PnlPrior, SyncInfo } from "@/lib/types";
 import { SYNC_EVENT } from "../Presence";
@@ -109,11 +109,11 @@ export function AccountVisibilityPanel({
     const codes = state.hidden[name] ?? [];
     void save({ ...state.hidden, [name]: isHidden(name, code) ? codes.filter((c) => c !== code) : [...codes, code] });
   };
-  // 한 줄 전체(부서 칸만): 모두 보이면 → 금액 없는 부서는 모두 숨김 / 하나라도 숨겼으면 → 모두 보이기. ‘손익’ 칸은 그대로 둔다
+  // 한 줄 전체(부서 칸만): 모두 보이면 → 금액 없는 부서는 모두 숨김 / 하나라도 숨겼으면 → 모두 보이기. ‘전체 예산’·‘손익’ 칸은 그대로 둔다
   const toggleRow = (name: string) => {
     const anyHidden = metas.some((m) => isHidden(name, m.code));
-    const keepPnl = isHidden(name, PNL_VISIBILITY) ? [PNL_VISIBILITY] : [];
-    void save({ ...state.hidden, [name]: [...(anyHidden ? [] : metas.filter((m) => amountOf(m.code, name) === 0).map((m) => m.code)), ...keepPnl] });
+    const keep = [BUDGET_VISIBILITY, PNL_VISIBILITY].filter((p) => isHidden(name, p));
+    void save({ ...state.hidden, [name]: [...(anyHidden ? [] : metas.filter((m) => amountOf(m.code, name) === 0).map((m) => m.code)), ...keep] });
   };
   const sensitiveNames = new Set(departments.flatMap((d) => d.accounts.filter(isSensitiveAccount).map((a) => a.name)));
   // 손익 줄 금액 — 2027(물류 제외 합)·2026 실적(이름을 고쳤으면 원래 이름으로). 어느 쪽이든 있으면 손익에서 못 숨김
@@ -129,7 +129,7 @@ export function AccountVisibilityPanel({
         <div>
           <h2>계정과목 노출</h2>
           <span className="muted">
-            계정과목마다 어느 부서 화면에 보일지 정합니다 — 끄면 그 부서 팀 화면의 계정별 예산·엑셀에서 빠집니다(경영지원 화면에는 흐리게 ‘숨김’으로 남음). 맨 오른쪽 ‘{year} 손익’을 미포함으로 하면 {year} 손익 표에서 그 줄이 빠집니다
+            계정과목마다 어느 부서 화면에 보일지 정합니다 — 끄면 그 부서 팀 화면의 계정별 예산·엑셀에서 빠집니다(경영지원 화면에는 흐리게 ‘숨김’으로 남음). ‘전체 예산’을 제외로 하면 팀 입력은 그대로 두고 전체 예산 현황 합계에서만 빠집니다(물류처럼). ‘{year} 손익’을 미포함으로 하면 {year} 손익 표에서 그 줄이 빠집니다
           </span>
         </div>
         <div className="actions">
@@ -162,6 +162,7 @@ export function AccountVisibilityPanel({
                 {metas.map((m) => (
                   <th key={m.code}>{m.name}</th>
                 ))}
+                <th className="budget-col">전체 예산</th>
                 <th className="pnl-col">{year} 손익</th>
               </tr>
             </thead>
@@ -211,6 +212,20 @@ export function AccountVisibilityPanel({
                         </td>
                       );
                     })}
+                    {(() => {
+                      const hiddenBudget = isHidden(name, BUDGET_VISIBILITY);
+                      const { total } = pnlOf(name); // 합산 대상(물류 제외) 부서의 연간 합 — 제외하면 이 금액이 전체 예산 합계에서 빠진다
+                      const secret = sensitiveNames.has(name);
+                      return (
+                        <td className={hiddenBudget ? "budget-col off" : "budget-col"}>
+                          <label title={hiddenBudget ? "전체 예산 합산 제외 — 누르면 포함(물류처럼 팀 입력·부서 원장은 그대로, 전체 합계에서만 빠짐)" : "전체 예산 합산 포함 — 누르면 제외(팀 입력은 그대로 두고 전체 예산 현황 합계에서만 뺌)"}>
+                            <input type="checkbox" checked={!hiddenBudget} disabled={saving} onChange={() => toggle(name, BUDGET_VISIBILITY)} />
+                            <span>{hiddenBudget ? "제외" : "포함"}</span>
+                          </label>
+                          {!secret && total !== 0 && <small>{money(total)}</small>}
+                        </td>
+                      );
+                    })()}
                     {(() => {
                       const { total, prior } = pnlOf(name);
                       const locked = total !== 0 || prior !== 0; // 손익 줄에 금액이 있으면 미포함으로 못 바꿈(미포함 뒤 금액이 생겨도 손익 표에는 나옴)

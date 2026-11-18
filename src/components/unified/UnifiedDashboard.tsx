@@ -259,7 +259,7 @@ export function UnifiedDashboard({
                 onDeptSaved={onDeptSaved}
               />
             )}
-            {tab === "budget" && <BudgetOverview year={year} departments={departments} onSelect={(code) => choose(`dept-${code}`)} onImported={() => void load()} />}
+            {tab === "budget" && <BudgetOverview year={year} departments={departments} hidden={visibility.hidden} onSelect={(code) => choose(`dept-${code}`)} onImported={() => void load()} />}
             {tab === "pnl" && (
               <PnlOverview year={year} prevYear={prevYear} departments={departments} channels={activeChannels(channels, plan)} plan={plan} pnlPrior={pnlPrior} hidden={visibility.hidden} onPlanSaved={setPlan} viewer={viewer} />
             )}
