@@ -95,6 +95,8 @@ export function Modal({ className, title, onClose, children, footer }: { classNa
       className={className}
       onCancel={(e) => {
         e.preventDefault();
+        // 중첩 팝업(이 창 안에 열린 또 다른 팝업)이 있으면 ESC 는 맨 위 팝업만 닫는다 — 이 창은 그대로 두어 한 번에 다 닫히지 않게
+        if (ref.current?.querySelector("dialog[open]")) return;
         onClose();
       }}
     >
