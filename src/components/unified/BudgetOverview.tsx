@@ -77,8 +77,10 @@ export function BudgetOverview({ year, prevYear, departments, hidden, prior2026,
         </div>
       </div>
       <div className="cards">
-        <StatCard label="전체 연간 예산" value={money(total)} note={`${included.length}개 부서 합계${total2026 ? ` · ${prevYear} 추정 ${money(total2026)} 대비 ${percent(pctChange(total, total2026))}` : ""}${excludedNames ? ` · ${excludedNames} 제외` : ""}${budgetExcludedNames.length ? ` · 합산 제외 계정 ${budgetExcludedNames.length}개` : ""}`} />
+        <StatCard label="전체 연간 예산" value={money(total)} note={`${included.length}개 부서 합계${excludedNames ? ` · ${excludedNames} 제외` : ""}${budgetExcludedNames.length ? ` · 합산 제외 계정 ${budgetExcludedNames.length}개` : ""}`} />
         <StatCard label="월평균 예산" value={money(total / 12)} note="연간 예산 ÷ 12개월" />
+        <StatCard label={`${prevYear}년 예상 실적`} value={total2026 ? money(total2026) : "—"} note={`${prevYear} 1~9월 확정분 ÷9×12 추정`} />
+        <StatCard label={`${prevYear} 대비 증감률`} value={total2026 ? percent(pctChange(total, total2026)) : "—"} unit="" note={`${year} 예산 vs ${prevYear} 예상 실적`} />
         <StatCard label="자료 마감 부서" value={`${closed} / ${departments.length}`} unit="개" note={closed === departments.length ? "모든 부서 마감" : `마감 전 ${departments.length - closed}개 부서`} />
         <StatCard label="예산 계정" value={accountNames.size} unit="개" note="전체 부서 계정 기준" />
       </div>
