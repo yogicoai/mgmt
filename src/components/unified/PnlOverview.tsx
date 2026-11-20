@@ -15,6 +15,7 @@ interface PnlRow {
   prior: number | null;
   kind: "head" | "sub" | "account" | "result";
   cogsIndex?: number;
+  editKey?: string; // 2026(전년) 값 수정 시 저장 키(항목명) — plan.pnl2026[editKey]
 }
 
 const ratio = (part: number, whole: number) => (whole ? `${((part / whole) * 100).toFixed(1)}%` : "—");
@@ -53,6 +54,10 @@ export function PnlOverview({
   const { notify } = useUi();
   const [rateText, setRateText] = useState(plan.cogsRate != null ? String(+(plan.cogsRate * 100).toFixed(2)) : "");
   const [savingRate, setSavingRate] = useState(false);
+  // 2026(전년) 손익 열 전체 수정 — 경영지원만. [2026년 예산 수정] → 열 전체 입력칸 → 저장
+  const [editing2026, setEditing2026] = useState(false);
+  const [draft2026, setDraft2026] = useState<Record<string, string>>({});
+  const [saving2026, setSaving2026] = useState(false);
   const saveRate = async (rate: number | null) => {
     setSavingRate(true);
     try {
@@ -73,7 +78,7 @@ export function PnlOverview({
 
   const sensitiveNames = useMemo(() => new Set(departments.flatMap((d) => d.accounts.filter(isSensitiveAccount).map((a) => a.name))), [departments]);
   const maskedRow = (label: string) => !sensitive.visible && sensitiveNames.has(label);
-  const priorOf = (name: string) => pnlPrior.find((p) => p.name === name)?.prior ?? null;
+  const priorOf = (name: string) => plan.pnl2026?.[name] ?? pnlPrior.find((p) => p.name === name)?.prior ?? null;
 
   const rows = useMemo<PnlRow[]>(() => {
     const { values } = channelTotals(departments, channels);
@@ -90,16 +95,16 @@ export function PnlOverview({
     );
     const sga = MONTHS.map((_, m) => accountMonths.reduce((t, a) => t + a[m], 0));
     const operating = gross.map((v, m) => v - sga[m]);
-    const accountRows = accountList.map((a, i) => ({ label: a.name, months: accountMonths[i], prior: priorOf(a.origin ?? a.name), kind: "account" as const })); // 이름을 고쳐도 전년 값은 원래 이름으로
+    const accountRows = accountList.map((a, i) => ({ label: a.name, months: accountMonths[i], prior: priorOf(a.origin ?? a.name), kind: "account" as const, editKey: a.origin ?? a.name })); // 이름을 고쳐도 전년 값은 원래 이름으로
     return [
-      { label: "Ⅰ.매출액", months: revenue, prior: priorOf("Ⅰ.매출액"), kind: "head" },
-      { label: rate != null ? `Ⅱ.매출원가 (원가율 ${(rate * 100).toFixed(rate * 100 % 1 ? 1 : 0)}%)` : "Ⅱ.매출원가", months: cogs, prior: priorOf("Ⅱ.매출원가"), kind: "head" },
+      { label: "Ⅰ.매출액", months: revenue, prior: priorOf("Ⅰ.매출액"), kind: "head", editKey: "Ⅰ.매출액" },
+      { label: rate != null ? `Ⅱ.매출원가 (원가율 ${(rate * 100).toFixed(rate * 100 % 1 ? 1 : 0)}%)` : "Ⅱ.매출원가", months: cogs, prior: priorOf("Ⅱ.매출원가"), kind: "head", editKey: "Ⅱ.매출원가" },
       // 원가율 적용 중이면 제품·상품 수동줄은 숨긴다(원가율이 매출원가를 덮어쓰므로)
       ...(rate != null ? [] : plan.cogs.map((c, i) => ({ label: c.label, months: c.values, prior: null, kind: "sub" as const, cogsIndex: i }))),
-      { label: "Ⅲ.매출총이익", months: gross, prior: priorOf("Ⅲ.매출총이익"), kind: "result" },
+      { label: "Ⅲ.매출총이익", months: gross, prior: priorOf("Ⅲ.매출총이익"), kind: "result", editKey: "Ⅲ.매출총이익" },
       ...accountRows,
-      { label: "Ⅳ.판매비와관리비", months: sga, prior: priorOf("Ⅳ.판매비와관리비"), kind: "head" },
-      { label: "Ⅴ.영업손익", months: operating, prior: priorOf("Ⅴ.영업손익"), kind: "result" },
+      { label: "Ⅳ.판매비와관리비", months: sga, prior: priorOf("Ⅳ.판매비와관리비"), kind: "head", editKey: "Ⅳ.판매비와관리비" },
+      { label: "Ⅴ.영업손익", months: operating, prior: priorOf("Ⅴ.영업손익"), kind: "result", editKey: "Ⅴ.영업손익" },
     ];
   }, [departments, channels, plan, pnlPrior, hidden]); // priorOf 는 pnlPrior 로만 결정된다
 
@@ -111,6 +116,35 @@ export function PnlOverview({
   const opTotal = total("Ⅴ.영업손익");
   const cogsEmpty = plan.cogsRate == null && total("Ⅱ.매출원가") === 0; // 원가율 적용 중이면 '미입력' 안내 안 함
   const change = (now: number, before: number | null) => (before === null || before === 0 ? null : (now - before) / Math.abs(before));
+
+  // [2026년 예산 수정] — 현재 보이는(가려지지 않은) 2026 값을 입력칸에 채우고 수정 모드로
+  const enterEdit2026 = () => {
+    const d: Record<string, string> = {};
+    rows.forEach((r) => {
+      if (r.editKey && !maskedRow(r.label)) d[r.editKey] = r.prior == null ? "" : String(r.prior);
+    });
+    setDraft2026(d);
+    setEditing2026(true);
+  };
+  const savePnl2026 = async () => {
+    const next: Record<string, number> = { ...(plan.pnl2026 ?? {}) }; // 가려진 줄(급여 등)은 기존 값 유지
+    for (const [k, raw] of Object.entries(draft2026)) {
+      const n = Number(String(raw).replace(/,/g, "").trim() || "0");
+      if (!Number.isFinite(n)) return notify(`‘${k}’ 값이 숫자가 아닙니다.`, true);
+      next[k] = Math.round(n);
+    }
+    setSaving2026(true);
+    try {
+      const { plan: p } = await api<{ plan: RevenuePlan }>("/api/revenue", { method: "PATCH", body: JSON.stringify({ revision: plan.revision, pnl2026: next }) });
+      onPlanSaved(p);
+      setEditing2026(false);
+      notify("2026년 손익(전년) 값을 저장했습니다.");
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e), true);
+    } finally {
+      setSaving2026(false);
+    }
+  };
 
   const exportCsv = () =>
     downloadCsv(`${year}_손익_기준_예산안.csv`, [
@@ -158,6 +192,21 @@ export function PnlOverview({
         <div className="panel-head">
           <h3>손익 기준 예산안</h3>
           {viewer.isAdmin && (
+            <div className="pnl-admin-tools">
+              {!editing2026 ? (
+                <button type="button" className="primary" onClick={enterEdit2026} title="2026(전년) 손익 값을 전체 수정합니다. 급여 등 가려진 줄은 먼저 🔒 보기로 풀어야 수정됩니다.">
+                  2026년 예산 수정
+                </button>
+              ) : (
+                <>
+                  <button type="button" className="primary" disabled={saving2026} onClick={() => void savePnl2026()}>
+                    {saving2026 ? "저장 중…" : "저장"}
+                  </button>
+                  <button type="button" disabled={saving2026} onClick={() => setEditing2026(false)}>
+                    취소
+                  </button>
+                </>
+              )}
             <span className="cogs-rate" title="매출원가 = 매출액 × 원가율로 자동 계산됩니다. 비우고 [해제]하면 제품·상품 매출원가 수동 입력을 씁니다.">
               원가율
               <input
@@ -185,6 +234,7 @@ export function PnlOverview({
                 </button>
               )}
             </span>
+            </div>
           )}
         </div>
         <p className="muted" style={{ margin: "-4px 0 10px", fontSize: 12 }}>
@@ -270,7 +320,17 @@ export function PnlOverview({
                       <>
                         <td>
                           <b>{money(now)}</b>
-                          {r.prior !== null && <span className="sub-line">{money(r.prior)}</span>}
+                          {editing2026 && r.editKey ? (
+                            <input
+                              className="pnl-edit-input compact"
+                              inputMode="numeric"
+                              value={draft2026[r.editKey] ?? ""}
+                              aria-label={`${r.label} ${prevYear} 값`}
+                              onChange={(e) => { const v = e.target.value; setDraft2026((d) => ({ ...d, [r.editKey!]: v })); }}
+                            />
+                          ) : (
+                            r.prior !== null && <span className="sub-line">{money(r.prior)}</span>
+                          )}
                         </td>
                         <td className={r.prior !== null && now - r.prior < 0 ? "neg" : undefined}>
                           {r.prior === null ? "" : money(now - r.prior)}
@@ -279,7 +339,21 @@ export function PnlOverview({
                       </>
                     ) : (
                       <>
-                        <td className="muted">{r.prior === null ? "" : money(r.prior)}</td>
+                        <td className="muted">
+                          {editing2026 && r.editKey ? (
+                            <input
+                              className="pnl-edit-input"
+                              inputMode="numeric"
+                              value={draft2026[r.editKey] ?? ""}
+                              aria-label={`${r.label} ${prevYear} 값`}
+                              onChange={(e) => { const v = e.target.value; setDraft2026((d) => ({ ...d, [r.editKey!]: v })); }}
+                            />
+                          ) : r.prior === null ? (
+                            ""
+                          ) : (
+                            money(r.prior)
+                          )}
+                        </td>
                         <td>
                           <b>{money(now)}</b>
                         </td>

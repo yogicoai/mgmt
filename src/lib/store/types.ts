@@ -12,6 +12,7 @@ export interface PlanPatch {
   cogs?: FeeRow[];
   cogsRate?: number | null;
   prior2026?: Record<string, number>;
+  pnl2026?: Record<string, number>;
   rowOrder?: Record<string, string[]>;
   rowLabels?: Record<string, Record<string, string>>;
   rowHidden?: Record<string, string[]>;
