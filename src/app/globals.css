@@ -68,6 +68,15 @@ button.link { border: 0; background: none; padding: 0; color: var(--blue); font-
 /* 합산 제외 부서(물류)에만 보이는 계정과목 — 이름 칸 연한 주황 + 왼쪽 띠 + ‘물류 전용’ 표시 */
 .visibility-table tbody tr.excluded-only td:first-child { background: #fff7ed; box-shadow: inset 4px 0 0 #fb923c, inset -1px 0 0 var(--line); }
 .only-chip { margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #ffedd5; color: #9a3412; font-size: 10.5px; font-weight: 800; white-space: nowrap; }
+/* 손익 원가율 입력(매출원가 = 매출액 × 원가율) */
+.cogs-rate { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--ink-2, #475569); white-space: nowrap; }
+.cogs-rate input { width: 66px; text-align: right; padding: 5px 7px; font-size: 13px; }
+/* 부서 화면 상단 '2026 추정실적' 카드 — 조회(값+수정) / 수정(입력) */
+.prior2026-view { display: inline-flex; align-items: baseline; gap: 10px; }
+.prior2026-view button.link { font-size: 12px; font-weight: 700; align-self: center; }
+.prior2026-edit { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.prior2026-edit input { width: 150px; font-size: 16px; font-weight: 800; text-align: right; padding: 3px 8px; }
+.prior2026-edit button { font-size: 12px; font-weight: 700; padding: 5px 10px; }
 /* ‘전체 예산’ 합산 포함/제외 칸 — 초록 띠로 구분(물류식 합산 제외) */
 .visibility-table .budget-col { box-shadow: inset 2px 0 0 #10b981; }
 .visibility-table thead .budget-col { color: #047857; }
@@ -142,7 +151,7 @@ a { color: var(--blue); }
 .subtabs button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 7px 16px; font-size: 13px; font-weight: 700; color: var(--muted); cursor: pointer; }
 .subtabs button.active { background: var(--blue); border-color: var(--blue); color: #fff; }
 
-main.page { max-width: 1840px; margin: 0 auto; padding: 24px 28px 60px; }
+main.page { max-width: 2240px; margin: 0 auto; padding: 24px 18px 60px; }
 .section-title { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
 .section-title h2 { margin: 0 0 4px; font-size: 21px; letter-spacing: -0.4px; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -164,6 +173,8 @@ main.page { max-width: 1840px; margin: 0 auto; padding: 24px 28px 60px; }
 .cards.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .cards.five .card { padding: 18px 16px; }
 .cards.five .card .value { font-size: clamp(19px, 1.55vw, 26px); white-space: nowrap; word-break: normal; }
+/* 여섯 장 — 3열씩 두 줄(3/3) */
+.cards.cards-3col { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 /* ── 패널·표 ── */
 .grid-2 { display: grid; grid-template-columns: 1.5fr 1fr; gap: 18px; margin-bottom: 18px; }
@@ -466,6 +477,7 @@ table.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbi
 @media (max-width: 1200px) {
   .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cards.five { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cards.cards-3col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cards.five .card .value { font-size: 22px; }
   .grid-2 { grid-template-columns: 1fr; }
   .brand h1 { font-size: 19px; }
@@ -490,7 +502,7 @@ table.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbi
   .chart svg { min-width: 620px; }
 }
 @media (max-width: 520px) {
-  .cards, .cards.five { grid-template-columns: 1fr; gap: 10px; }
+  .cards, .cards.five, .cards.cards-3col { grid-template-columns: 1fr; gap: 10px; }
   .card .value { word-break: keep-all; }
 }
 @media print {

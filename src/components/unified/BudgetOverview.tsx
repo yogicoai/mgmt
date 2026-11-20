@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MONTHS, accountMonths, budgetAccountsMonths, departmentStatus, hiddenInBudget, inBudgetTotal, money, sum } from "@/lib/budget";
+import { MONTHS, accountMonths, budgetAccountsMonths, departmentStatus, hiddenInBudget, inBudgetTotal, money, percent, sum } from "@/lib/budget";
 import { api, downloadCsv } from "@/lib/client";
 import type { DepartmentDoc } from "@/lib/types";
 import { BarChart, RankBars } from "../charts";
 import { Modal, StatCard, useUi } from "../ui";
 
+const pctChange = (now: number, before: number) => (before ? (now - before) / before : null); // 2026 추정 대비 2027 증감률
+
 // 전체 예산 현황 — 부서 문서의 계정별 예산을 그대로 합산(원본 renderOverview). ‘전체 예산’ 미포함(물류식) 계정과목은 합산에서 뺀다.
-export function BudgetOverview({ year, departments, hidden, onSelect, onImported }: { year: number; departments: DepartmentDoc[]; hidden: Record<string, string[]>; onSelect: (code: string) => void; onImported: () => void }) {
+//   부서별 연간 합계 옆에 2026 추정실적(1~9월 ÷9×12)과 그 대비 증감률을 같이 보여 준다.
+export function BudgetOverview({ year, prevYear, departments, hidden, prior2026, onSelect, onImported }: { year: number; prevYear: number; departments: DepartmentDoc[]; hidden: Record<string, string[]>; prior2026: Record<string, number>; onSelect: (code: string) => void; onImported: () => void }) {
   const [importing, setImporting] = useState(false);
   const [reviewCounts, setReviewCounts] = useState<Record<string, { open: number; total: number }>>({});
   useEffect(() => {
@@ -23,6 +26,7 @@ export function BudgetOverview({ year, departments, hidden, onSelect, onImported
   const perDept = included.map((d) => ({ doc: d, months: budgetAccountsMonths(d.accounts, hidden) }));
   const months = MONTHS.map((_, m) => perDept.reduce((t, d) => t + d.months[m], 0));
   const total = sum(months);
+  const total2026 = included.reduce((t, d) => t + (prior2026[d.code] || 0), 0); // 2026 추정 연 합(합산 부서)
   const closed = departments.filter((d) => d.closed).length; // 저장은 실시간이라 마감 기준으로 센다
   const accountNames = new Set(departments.flatMap((d) => d.accounts.map((a) => a.name)));
   // 합산 제외(전체 예산 미포함) 계정과목 — 안내용. 합산 대상 부서에서 뺀 연간 금액도 모은다
@@ -73,7 +77,7 @@ export function BudgetOverview({ year, departments, hidden, onSelect, onImported
         </div>
       </div>
       <div className="cards">
-        <StatCard label="전체 연간 예산" value={money(total)} note={`${included.length}개 부서 계정별 예산 합계${excludedNames ? ` · ${excludedNames} 제외` : ""}${budgetExcludedNames.length ? ` · 합산 제외 계정 ${budgetExcludedNames.length}개` : ""}`} />
+        <StatCard label="전체 연간 예산" value={money(total)} note={`${included.length}개 부서 합계${total2026 ? ` · ${prevYear} 추정 ${money(total2026)} 대비 ${percent(pctChange(total, total2026))}` : ""}${excludedNames ? ` · ${excludedNames} 제외` : ""}${budgetExcludedNames.length ? ` · 합산 제외 계정 ${budgetExcludedNames.length}개` : ""}`} />
         <StatCard label="월평균 예산" value={money(total / 12)} note="연간 예산 ÷ 12개월" />
         <StatCard label="자료 마감 부서" value={`${closed} / ${departments.length}`} unit="개" note={closed === departments.length ? "모든 부서 마감" : `마감 전 ${departments.length - closed}개 부서`} />
         <StatCard label="예산 계정" value={accountNames.size} unit="개" note="전체 부서 계정 기준" />
@@ -108,6 +112,8 @@ export function BudgetOverview({ year, departments, hidden, onSelect, onImported
                 <col key={m} />
               ))}
               <col style={{ width: "8.5%" }} />
+              <col style={{ width: "9%" }} />
+              <col style={{ width: "6.5%" }} />
             </colgroup>
             <thead>
               <tr>
@@ -116,26 +122,35 @@ export function BudgetOverview({ year, departments, hidden, onSelect, onImported
                 {MONTHS.map((m) => (
                   <th key={m}>{m}</th>
                 ))}
-                <th>연간 합계</th>
+                <th>{year} 연간 합계</th>
+                <th title={`${prevYear} 1~9월 확정분 ÷9×12 추정`}>{prevYear} 추정</th>
+                <th title={`${year} 예산이 ${prevYear} 추정 대비 몇 % 증감인지`}>{prevYear} 대비</th>
               </tr>
             </thead>
             <tbody>
-              {perDept.map(({ doc, months: m }) => (
-                <tr key={doc.code}>
-                  <td>
-                    <button type="button" className="account-button" onClick={() => onSelect(doc.code)}>
-                      {doc.name}
-                    </button>
-                  </td>
-                  {statusCell(doc)}
-                  {m.map((v, i) => (
-                    <td key={i}>{money(v)}</td>
-                  ))}
-                  <td>
-                    <b>{money(sum(m))}</b>
-                  </td>
-                </tr>
-              ))}
+              {perDept.map(({ doc, months: m }) => {
+                const now = sum(m);
+                const prior = prior2026[doc.code] || 0;
+                const chg = pctChange(now, prior);
+                return (
+                  <tr key={doc.code}>
+                    <td>
+                      <button type="button" className="account-button" onClick={() => onSelect(doc.code)}>
+                        {doc.name}
+                      </button>
+                    </td>
+                    {statusCell(doc)}
+                    {m.map((v, i) => (
+                      <td key={i}>{money(v)}</td>
+                    ))}
+                    <td>
+                      <b>{money(now)}</b>
+                    </td>
+                    <td className="muted">{prior ? money(prior) : "—"}</td>
+                    <td className={chg !== null && chg < 0 ? "neg" : undefined}>{chg === null ? "—" : percent(chg)}</td>
+                  </tr>
+                );
+              })}
               {excluded.map((doc) => (
                 <tr key={doc.code}>
                   <td>
@@ -147,6 +162,8 @@ export function BudgetOverview({ year, departments, hidden, onSelect, onImported
                   <td colSpan={13} className="excluded-note">
                     합산 제외 — 금액은 {doc.name} 탭에서 확인
                   </td>
+                  <td className="muted">{prior2026[doc.code] ? money(prior2026[doc.code]) : "—"}</td>
+                  <td>—</td>
                 </tr>
               ))}
             </tbody>
@@ -157,6 +174,10 @@ export function BudgetOverview({ year, departments, hidden, onSelect, onImported
                   <td key={i}>{money(v)}</td>
                 ))}
                 <td>{money(total)}</td>
+                <td>{total2026 ? money(total2026) : "—"}</td>
+                <td className={pctChange(total, total2026) !== null && pctChange(total, total2026)! < 0 ? "neg" : undefined}>
+                  {pctChange(total, total2026) === null ? "—" : percent(pctChange(total, total2026))}
+                </td>
               </tr>
             </tfoot>
           </table>

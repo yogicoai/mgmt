@@ -36,6 +36,7 @@ export function UnifiedDashboard({
   channels,
   revenue2026,
   pnlPrior,
+  prior2026,
   viewer,
 }: {
   year: number;
@@ -44,6 +45,7 @@ export function UnifiedDashboard({
   channels: Channel[];
   revenue2026: Revenue2026Row[];
   pnlPrior: PnlPrior[];
+  prior2026: Record<string, number>;
   viewer: Viewer;
 }) {
   const { notify } = useUi();
@@ -259,12 +261,12 @@ export function UnifiedDashboard({
                 onDeptSaved={onDeptSaved}
               />
             )}
-            {tab === "budget" && <BudgetOverview year={year} departments={departments} hidden={visibility.hidden} onSelect={(code) => choose(`dept-${code}`)} onImported={() => void load()} />}
+            {tab === "budget" && <BudgetOverview year={year} prevYear={prevYear} departments={departments} hidden={visibility.hidden} prior2026={{ ...prior2026, ...(plan?.prior2026 ?? {}) }} onSelect={(code) => choose(`dept-${code}`)} onImported={() => void load()} />}
             {tab === "pnl" && (
               <PnlOverview year={year} prevYear={prevYear} departments={departments} channels={activeChannels(channels, plan)} plan={plan} pnlPrior={pnlPrior} hidden={visibility.hidden} onPlanSaved={setPlan} viewer={viewer} />
             )}
             {tab === "personnel" && <PersonnelOverview year={year} departments={departments} />}
-            {deptMeta && <DeptLedgerTab key={deptMeta.code} meta={deptMeta} year={year} onSaved={onDeptSaved} viewer={viewer} />}
+            {deptMeta && <DeptLedgerTab key={deptMeta.code} meta={deptMeta} year={year} onSaved={onDeptSaved} prior2026Auto={prior2026[deptMeta.code] ?? 0} prior2026={plan?.prior2026?.[deptMeta.code] ?? null} viewer={viewer} />}
             {tab === "backdata" && <BackdataOverview departments={departments} />}
             {settings && (
               <div className="subtabs no-print" role="tablist" aria-label="설정">

@@ -7,7 +7,7 @@ import { currentAccount } from "@/lib/auth/guard";
 import { MASTER_ID } from "@/lib/auth/local";
 import { activeChannels, kindNames, kindOf } from "@/lib/budget";
 import { getRevenuePlan } from "@/lib/departments";
-import { BUDGET_YEAR, channels, findDeptMeta } from "@/lib/templates";
+import { BUDGET_YEAR, channels, dept2026Estimate, findDeptMeta } from "@/lib/templates";
 
 type Props = { params: Promise<{ code: string }> };
 
@@ -35,6 +35,8 @@ export default async function DepartmentPage({ params }: Props) {
       prevYear={BUDGET_YEAR - 1}
       salesKinds={activeChannels(channels, plan).map(kindOf)}
       salesKindNames={kindNames(channels, plan)}
+      prior2026Auto={dept2026Estimate[code] ?? 0}
+      prior2026={plan.prior2026?.[code] ?? null}
       viewer={{ loginId: account.loginId, deptName: account.deptName, isAdmin: account.role === "admin", master: account._id === MASTER_ID }}
     />
   );

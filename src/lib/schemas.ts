@@ -58,9 +58,11 @@ export const planPatchSchema = z
     revision: z.number().int().min(0),
     fees: planRows.optional(),
     cogs: planRows.optional(),
+    cogsRate: z.number().min(0).max(1).nullable().optional(), // 원가율(0~1), null = 해제(수동으로)
+    prior2026: z.record(z.string().regex(/^\d{4}$/), amount.refine((v) => v >= 0)).optional(), // 팀별 2026 추정실적 입력(부서코드 → 연 금액)
     rowOrder: z.record(yearKey, z.array(z.string().max(60)).max(80)).optional(), // 매출 예산안 줄 순서(연도별)
     rowLabels: z.record(yearKey, z.record(z.string().max(60), z.string().trim().min(1, "구분명을 입력해 주세요.").max(60, "구분명은 60자까지 쓸 수 있습니다."))).optional(), // 구분명(연도별)
     rowHidden: z.record(yearKey, z.array(z.string().max(60)).max(80)).optional(), // 삭제한 줄(연도별)
     deptOrder: z.array(z.string().regex(/^\d{4}$/)).max(30).optional(), // 부서별 월별 목표매출의 부서 순서
   })
-  .refine((v) => v.fees || v.cogs || v.rowOrder || v.rowLabels || v.rowHidden || v.deptOrder, "저장할 내용이 없습니다.");
+  .refine((v) => v.fees || v.cogs || v.cogsRate !== undefined || v.prior2026 || v.rowOrder || v.rowLabels || v.rowHidden || v.deptOrder, "저장할 내용이 없습니다.");

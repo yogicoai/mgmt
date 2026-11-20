@@ -4,7 +4,7 @@ import { UnifiedDashboard } from "@/components/unified/UnifiedDashboard";
 import { homeOf } from "@/lib/auth/accounts";
 import { currentAccount } from "@/lib/auth/guard";
 import { MASTER_ID } from "@/lib/auth/local";
-import { BUDGET_YEAR, channels, deptMetas, pnlPrior, revenue2026 } from "@/lib/templates";
+import { BUDGET_YEAR, channels, dept2026Estimate, deptMetas, pnlPrior, revenue2026 } from "@/lib/templates";
 
 export const metadata: Metadata = { title: `${BUDGET_YEAR} 요기코퍼레이션 통합 예산` };
 export const dynamic = "force-dynamic";
@@ -22,6 +22,7 @@ export default async function Home() {
       channels={channels}
       revenue2026={revenue2026}
       pnlPrior={pnlPrior}
+      prior2026={dept2026Estimate}
       viewer={{ loginId: account.loginId, deptName: account.deptName, isAdmin: true, master: account._id === MASTER_ID }}
     />
   );

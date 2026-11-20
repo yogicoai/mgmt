@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { MONTHS, channelTotals, hiddenInPnl, inBudgetTotal, isSensitiveAccount, money, percent, revenueMetrics, sum } from "@/lib/budget";
-import { downloadCsv } from "@/lib/client";
+import { api, downloadCsv } from "@/lib/client";
 import type { Channel, DepartmentDoc, PnlPrior, RevenuePlan } from "@/lib/types";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { UnlockDialog, useSensitiveAccess } from "../SensitiveGate";
-import { StatCard, type Viewer } from "../ui";
+import { StatCard, useUi, type Viewer } from "../ui";
 import { PlanRowDialog } from "./PlanRowDialog";
 
 interface PnlRow {
@@ -43,11 +43,34 @@ export function PnlOverview({
   viewer: Viewer;
 }) {
   const [cogsIndex, setCogsIndex] = useState<number | null>(null);
-  // 1760px 보다 좁으면 전년은 당해 칸 아래 줄, 증감률은 증감 칸 아래 줄로 — 가로 한 화면 안에
-  const compact = useMediaQuery("(max-width: 1760px)");
+  // 2026(전년)·증감률을 별도 칸으로 편다 — 아주 좁은 화면(모바일)에서만 아랫줄로 접어 가로 폭을 줄인다
+  const compact = useMediaQuery("(max-width: 820px)");
   // 급여 등 경영지원 전용 계정 줄은 비밀번호 확인 전 가림
   const sensitive = useSensitiveAccess({ isAdmin: viewer.isAdmin, master: viewer.master });
   const [unlocking, setUnlocking] = useState(false);
+
+  // 원가율(매출원가 = 매출액 × 원가율) — 경영지원만. 적용하면 저장되어 모두에게 반영
+  const { notify } = useUi();
+  const [rateText, setRateText] = useState(plan.cogsRate != null ? String(+(plan.cogsRate * 100).toFixed(2)) : "");
+  const [savingRate, setSavingRate] = useState(false);
+  const saveRate = async (rate: number | null) => {
+    setSavingRate(true);
+    try {
+      const { plan: next } = await api<{ plan: RevenuePlan }>("/api/revenue", { method: "PATCH", body: JSON.stringify({ revision: plan.revision, cogsRate: rate }) });
+      onPlanSaved(next);
+      notify(rate == null ? "원가율을 해제했습니다 — 제품·상품 매출원가 수동 입력을 씁니다." : `원가율 ${+(rate * 100).toFixed(2)}%를 적용했습니다.`);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e), true);
+    } finally {
+      setSavingRate(false);
+    }
+  };
+  const applyRate = () => {
+    const pct = Number(rateText.replace(/,/g, "").trim());
+    if (!Number.isFinite(pct) || pct < 0 || pct > 100) return notify("원가율은 0~100 사이 숫자로 입력해 주세요.", true);
+    void saveRate(pct / 100);
+  };
+
   const sensitiveNames = useMemo(() => new Set(departments.flatMap((d) => d.accounts.filter(isSensitiveAccount).map((a) => a.name))), [departments]);
   const maskedRow = (label: string) => !sensitive.visible && sensitiveNames.has(label);
   const priorOf = (name: string) => pnlPrior.find((p) => p.name === name)?.prior ?? null;
@@ -55,7 +78,9 @@ export function PnlOverview({
   const rows = useMemo<PnlRow[]>(() => {
     const { values } = channelTotals(departments, channels);
     const revenue = revenueMetrics(values, plan.fees).net;
-    const cogs = MONTHS.map((_, m) => plan.cogs.reduce((s, r) => s + (r.values[m] || 0), 0));
+    // 원가율이 있으면 매출원가 = 매출액 × 원가율(월별 자동), 없으면 제품·상품 수동입력 합
+    const rate = plan.cogsRate ?? null;
+    const cogs = rate != null ? revenue.map((v) => Math.round(v * rate)) : MONTHS.map((_, m) => plan.cogs.reduce((s, r) => s + (r.values[m] || 0), 0));
     const gross = revenue.map((v, m) => v - cogs[m]);
     // 계정과목 노출의 ‘2027 손익’ 칸에서 미포함한 계정은 판관비 합계·표에서 모두 뺀다(물류처럼 — 금액이 있어도 제외)
     const accountList = (departments[0]?.accounts ?? []).filter((a) => !hiddenInPnl(hidden, a.name));
@@ -68,8 +93,9 @@ export function PnlOverview({
     const accountRows = accountList.map((a, i) => ({ label: a.name, months: accountMonths[i], prior: priorOf(a.origin ?? a.name), kind: "account" as const })); // 이름을 고쳐도 전년 값은 원래 이름으로
     return [
       { label: "Ⅰ.매출액", months: revenue, prior: priorOf("Ⅰ.매출액"), kind: "head" },
-      { label: "Ⅱ.매출원가", months: cogs, prior: priorOf("Ⅱ.매출원가"), kind: "head" },
-      ...plan.cogs.map((c, i) => ({ label: c.label, months: c.values, prior: null, kind: "sub" as const, cogsIndex: i })),
+      { label: rate != null ? `Ⅱ.매출원가 (원가율 ${(rate * 100).toFixed(rate * 100 % 1 ? 1 : 0)}%)` : "Ⅱ.매출원가", months: cogs, prior: priorOf("Ⅱ.매출원가"), kind: "head" },
+      // 원가율 적용 중이면 제품·상품 수동줄은 숨긴다(원가율이 매출원가를 덮어쓰므로)
+      ...(rate != null ? [] : plan.cogs.map((c, i) => ({ label: c.label, months: c.values, prior: null, kind: "sub" as const, cogsIndex: i }))),
       { label: "Ⅲ.매출총이익", months: gross, prior: priorOf("Ⅲ.매출총이익"), kind: "result" },
       ...accountRows,
       { label: "Ⅳ.판매비와관리비", months: sga, prior: priorOf("Ⅳ.판매비와관리비"), kind: "head" },
@@ -83,7 +109,7 @@ export function PnlOverview({
   const grossTotal = total("Ⅲ.매출총이익");
   const sgaTotal = total("Ⅳ.판매비와관리비");
   const opTotal = total("Ⅴ.영업손익");
-  const cogsEmpty = total("Ⅱ.매출원가") === 0;
+  const cogsEmpty = plan.cogsRate == null && total("Ⅱ.매출원가") === 0; // 원가율 적용 중이면 '미입력' 안내 안 함
   const change = (now: number, before: number | null) => (before === null || before === 0 ? null : (now - before) / Math.abs(before));
 
   const exportCsv = () =>
@@ -131,10 +157,39 @@ export function PnlOverview({
       <section className="panel">
         <div className="panel-head">
           <h3>손익 기준 예산안</h3>
-          <span className="muted">
-            단위: 원 · {prevYear}는 원본 손익표의 전년 값 · 매출액은 전체 매출 현황의 ‘(손익계산서) 매출액’ · 판관비는 부서 화면 입력값 실시간 합산
-          </span>
+          {viewer.isAdmin && (
+            <span className="cogs-rate" title="매출원가 = 매출액 × 원가율로 자동 계산됩니다. 비우고 [해제]하면 제품·상품 매출원가 수동 입력을 씁니다.">
+              원가율
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={100}
+                step={0.1}
+                value={rateText}
+                disabled={savingRate}
+                placeholder="예: 50"
+                aria-label="매출원가 원가율(%)"
+                onChange={(e) => setRateText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) applyRate();
+                }}
+              />
+              %
+              <button type="button" className="primary" disabled={savingRate} onClick={applyRate}>
+                적용
+              </button>
+              {plan.cogsRate != null && (
+                <button type="button" disabled={savingRate} onClick={() => { setRateText(""); void saveRate(null); }}>
+                  해제
+                </button>
+              )}
+            </span>
+          )}
         </div>
+        <p className="muted" style={{ margin: "-4px 0 10px", fontSize: 12 }}>
+          단위: 원 · {prevYear}는 원본 손익표의 전년 값 · 매출액은 전체 매출 현황의 ‘(손익계산서) 매출액’ · 판관비는 부서 화면 입력값 실시간 합산 · 원가율을 넣으면 매출원가·매출총이익·증감이 자동으로 바뀝니다
+        </p>
         <div className="tablewrap free">
           <table className="pnl-table fit-table">
             <colgroup>

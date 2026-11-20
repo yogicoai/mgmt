@@ -10,7 +10,7 @@ import { ReviewPanel } from "../budget/ReviewPanel";
 import { useUi, type Viewer } from "../ui";
 
 // 통합 대시보드의 부서 탭 — 부서 화면과 같은 원장(같은 DB 문서)을 보고 고치며, 마감/마감 해제·검토 의견을 남긴다
-export function DeptLedgerTab({ meta, year, onSaved, viewer }: { meta: DeptMeta; year: number; onSaved: () => void; viewer: Viewer }) {
+export function DeptLedgerTab({ meta, year, onSaved, prior2026Auto, prior2026, viewer }: { meta: DeptMeta; year: number; onSaved: () => void; prior2026Auto: number; prior2026: number | null; viewer: Viewer }) {
   const { notify } = useUi();
   const state = useDepartment(meta.code, { onSaved });
   const reviews = useReviews(meta.code);
@@ -73,6 +73,8 @@ export function DeptLedgerTab({ meta, year, onSaved, viewer }: { meta: DeptMeta;
           isAdmin={viewer.isAdmin}
           master={viewer.master}
           hiddenAccounts={hiddenAccounts}
+          prior2026Auto={prior2026Auto}
+          prior2026={prior2026}
           onReload={async () => {
             // 계정과목 순서는 전 부서 공통 — 이 부서 문서를 다시 받고 통합 합산(손익 등)도 새로
             await state.reload();

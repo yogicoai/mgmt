@@ -42,6 +42,8 @@ export function DeptDashboard({
   prevYear,
   salesKinds,
   salesKindNames,
+  prior2026Auto,
+  prior2026,
   viewer,
 }: {
   meta: DeptMeta;
@@ -50,6 +52,8 @@ export function DeptDashboard({
   prevYear: number;
   salesKinds: string[];
   salesKindNames: Record<string, string>;
+  prior2026Auto: number;
+  prior2026: number | null;
   viewer: Viewer;
 }) {
   const { notify } = useUi();
@@ -205,6 +209,8 @@ export function DeptDashboard({
             master={viewer.master}
             hiddenAccounts={hiddenAccounts}
             onReload={viewer.isAdmin ? state.reload : undefined}
+            prior2026Auto={prior2026Auto}
+            prior2026={prior2026}
             actions={
               editable && (
                 <>

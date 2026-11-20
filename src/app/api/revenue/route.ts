@@ -41,6 +41,8 @@ export const PATCH = handle(async (request: Request) => {
   const result = await getStore().savePlanRows(BUDGET_YEAR, body.revision, {
     ...(body.fees ? { fees: body.fees } : {}),
     ...(body.cogs ? { cogs: body.cogs } : {}),
+    ...(body.cogsRate !== undefined ? { cogsRate: body.cogsRate } : {}),
+    ...(body.prior2026 ? { prior2026: body.prior2026 } : {}),
     ...(body.rowOrder ? { rowOrder: body.rowOrder } : {}),
     ...(body.rowLabels ? { rowLabels: body.rowLabels } : {}),
     ...(body.rowHidden ? { rowHidden: body.rowHidden } : {}),

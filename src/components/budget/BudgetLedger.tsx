@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useLongPressDrag } from "@/hooks/useLongPressDrag";
-import { MONTHS, accountMonths, accountsMonths, filledAccountCount, isSensitiveAccount, money, sum } from "@/lib/budget";
+import { MONTHS, accountMonths, accountsMonths, filledAccountCount, isSensitiveAccount, money, percent, sum } from "@/lib/budget";
 import { api, downloadFrom, formatTime } from "@/lib/client";
 import type { BudgetAccount, DepartmentDoc, ReviewComment } from "@/lib/types";
 import { UnlockDialog, useSensitiveAccess } from "../SensitiveGate";
@@ -39,6 +39,8 @@ export function BudgetLedger({
   master = false,
   hiddenAccounts = NONE,
   onReload,
+  prior2026Auto = 0,
+  prior2026 = null,
 }: {
   doc: DepartmentDoc;
   editable: boolean;
@@ -51,11 +53,32 @@ export function BudgetLedger({
   hiddenAccounts?: string[]; // 계정과목 노출 설정에서 이 부서에 숨긴 계정 — 팀 화면에서는 빠지고 경영지원 화면에는 흐리게
   master?: boolean;
   onReload?: () => Promise<unknown>; // 계정과목 순서를 바꾼 뒤 부서 문서를 다시 받기 — 주면 경영지원은 계정과목 칸을 끌어 순서를 바꿀 수 있다
+  prior2026Auto?: number; // 우리 부서 2026 자동 추정(템플릿 9개월 ÷9×12)
+  prior2026?: number | null; // 경영지원/팀이 입력해 저장한 2026 추정실적(없으면 자동)
 }) {
   const { showTip, hideTip, notify } = useUi();
   const [query, setQuery] = useState("");
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
+  // 우리 부서 2026 추정실적 — 팀·경영지원이 본인 부서 값을 입력(저장하면 전체 예산 현황의 2026 추정에도 반영)
+  const [priorText, setPriorText] = useState(prior2026 != null ? String(prior2026) : "");
+  const [savingPrior, setSavingPrior] = useState(false);
+  const [editing2026, setEditing2026] = useState(false); // 경영지원이 [수정]을 누르면 입력 모드
+  const savePrior = async () => {
+    const t = priorText.replace(/,/g, "").trim();
+    const n = Number(t);
+    if (t !== "" && (!Number.isFinite(n) || n < 0)) return notify("2026 추정실적은 0 이상 숫자로 입력해 주세요.", true);
+    setSavingPrior(true);
+    try {
+      await api(`/api/departments/${doc.code}/prior2026`, { method: "PATCH", body: JSON.stringify({ value: t === "" ? null : Math.round(n) }) });
+      notify(t === "" ? "2026 추정실적을 비웠습니다(자동 추정을 씁니다)." : "2026 추정실적을 저장했습니다.");
+      setEditing2026(false);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e), true);
+    } finally {
+      setSavingPrior(false);
+    }
+  };
   const fileInput = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<UploadPreview | null>(null);
@@ -171,10 +194,69 @@ export function BudgetLedger({
           if (file) void uploadExcel(file);
         }}
       />
-      <div className="cards">
+      <div className="cards cards-3col">
         <StatCard label="연간 예산" value={money(total)} note={accounts.some((a) => a.masked) ? `${doc.name} 합계 · 급여 등 경영지원 입력 계정 제외` : `${doc.name} 전체 계정 합계`} />
         <StatCard label="월평균 예산" value={money(total / 12)} note="연간 예산 ÷ 12개월" />
         <StatCard label="입력 계정" value={`${filledAccountCount(shownAccounts)} / ${shownAccounts.length}`} unit="개" note="금액이 입력된 계정" />
+        {(() => {
+          const t = priorText.replace(/,/g, "").trim();
+          const n = Number(t);
+          const eff = t !== "" && Number.isFinite(n) ? n : prior2026Auto; // 저장값(있으면) 아니면 자동 추정
+          const chg = eff ? (total - eff) / eff : null;
+          const prevYear = doc.year - 1;
+          return (
+            <>
+              <StatCard
+                label={`${prevYear} 추정실적`}
+                unit=""
+                note={editing2026 ? `비우면 자동 추정 ${money(prior2026Auto)}` : prior2026 != null ? "경영지원 입력값" : `자동 추정(1~9월 ÷9×12)`}
+                value={
+                  isAdmin && editing2026 ? (
+                    <span className="prior2026-edit">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        value={priorText}
+                        disabled={savingPrior}
+                        placeholder="자동 사용"
+                        aria-label={`${prevYear} 추정실적`}
+                        autoFocus
+                        onChange={(e) => setPriorText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.nativeEvent.isComposing) void savePrior();
+                        }}
+                      />
+                      <button type="button" className="primary" disabled={savingPrior} onClick={() => void savePrior()}>
+                        저장
+                      </button>
+                      <button
+                        type="button"
+                        disabled={savingPrior}
+                        onClick={() => {
+                          setPriorText(prior2026 != null ? String(prior2026) : "");
+                          setEditing2026(false);
+                        }}
+                      >
+                        취소
+                      </button>
+                    </span>
+                  ) : (
+                    <span className="prior2026-view">
+                      {money(eff)}
+                      {isAdmin && (
+                        <button type="button" className="link" onClick={() => setEditing2026(true)} title="2026 추정실적 수정(경영지원)">
+                          수정
+                        </button>
+                      )}
+                    </span>
+                  )
+                }
+              />
+              <StatCard label={`${prevYear} 대비`} value={chg === null ? "—" : percent(chg)} unit="" note={`${doc.year} 예산 ÷ ${prevYear} 추정실적`} />
+            </>
+          );
+        })()}
         <StatCard label="상태" value={statusLabel} unit="" note={doc.closed ? `마감 ${formatTime(doc.closedAt)}` : doc.savedAt ? `마지막 저장 ${formatTime(doc.savedAt)}` : "입력 전"} />
       </div>
       <section className="panel" data-anchor="ledger">

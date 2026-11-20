@@ -37,6 +37,19 @@ export const channels = revenue.channels as Channel[];
 export const revenue2026 = revenue.rows2026 as Revenue2026Row[];
 export const pnlPrior = revenue.pnlPrior as PnlPrior[];
 
+// 2026 추정실적(부서별 연 환산) — 템플릿의 월별 실적(actual)을 '확정된 N개월 ÷N×12'로 연간 추정.
+//   이사님 지시: 2026은 1~9월만 확정이라 /9×12. 더 많은 달이 확정되면 이 상수만 바꾸면 된다.
+export const ACTUALS_MONTHS_2026 = 9;
+export const dept2026Estimate: Record<string, number> = Object.fromEntries(
+  deptTemplates.map((t) => {
+    const sum = t.accounts.reduce(
+      (s, a) => s + a.rows.reduce((rs, r) => rs + (r.actual ?? []).slice(0, ACTUALS_MONTHS_2026).reduce((x, v) => x + (v || 0), 0), 0),
+      0,
+    );
+    return [t.code, Math.round((sum * 12) / ACTUALS_MONTHS_2026)];
+  }),
+);
+
 // 템플릿상 경영지원 입력 줄인가(이미 만들어진 부서 문서에 잠금을 처음 붙일 때 사용)
 export function templateLocked(code: string, account: string, item: string, desc: string) {
   const t = deptTemplates.find((d) => d.code === code);

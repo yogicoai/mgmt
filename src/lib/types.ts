@@ -143,6 +143,8 @@ export interface RevenuePlan {
   year: number;
   fees: FeeRow[];
   cogs: FeeRow[]; // 매출원가(제품·상품) — 경영지원 입력, 손익 탭에서 사용
+  cogsRate?: number | null; // 원가율(0~1). 넣으면 매출원가 = 매출액 × 원가율로 자동 계산(제품·상품 수동입력 대신). null/없음 = 수동
+  prior2026?: Record<string, number>; // 팀(부서코드)별 2026 추정실적 — 경영지원이 손익 탭에서 입력(없는 부서는 템플릿 9개월 자동 추정)
   rowOrder?: Record<string, string[]>; // 매출 예산안 줄 순서(연도별) — 경영지원이 꾹 눌러 끌어서 바꾼 것
   rowLabels?: Record<string, Record<string, string>>; // 매출 예산안 구분명(연도별, 줄 id → 고친 이름). 채널은 저장된 매출 구분을 그대로 두고 표시만 바뀐다
   rowHidden?: Record<string, string[]>; // 매출 예산안에서 삭제한 줄(연도별 줄 id) — 복원 가능
